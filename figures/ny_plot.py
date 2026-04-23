@@ -5,8 +5,6 @@ import matplotlib.image as mpimg
 import seaborn as sns
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 import networkx as nx
-import contextily as ctx
-from pyproj import Transformer
 import utilities.read_write as rw
 from utilities import draw_network
 from utilities.figures_utilities import (
@@ -24,11 +22,17 @@ NEW_YORK_ASYMPTOTIC_FILE_NAME = r'data/ny/nyc_asymptotic.nxjson'
 NEW_YORK_MCMC_FILE_NAME = r'data/ny/mcmc_simulation.nxjson'
 
 def nature_ny_graph(
-    new_york_file_name=NEW_YORK_FILE_NAME,
-    new_york_asymptotic_file_name: str=NEW_YORK_ASYMPTOTIC_FILE_NAME,
-    MCMC_file_name: str=NEW_YORK_MCMC_FILE_NAME,
-    save=False, 
-):
+    new_york_file_name: str = NEW_YORK_FILE_NAME,
+    new_york_asymptotic_file_name: str = NEW_YORK_ASYMPTOTIC_FILE_NAME,
+    MCMC_file_name: str = NEW_YORK_MCMC_FILE_NAME,
+    save: bool = False, 
+) -> tuple[plt.Figure, dict]:
+    """
+    Generate the main New York network figure for Nature submission.
+    
+    Creates a 3-row layout figure showing tree and ring topologies, 
+    reliability plots (MCMC and polynomial), and scaling analysis.
+    """
     # figure
     fig, axs = make_figure_layout(figsize=(15, 17.5), group_gap=0.5, big_ratio=1.15, inter_group_gap=0.4, top_hspace=0.35)
     ny_data = rw.read_nxjson(new_york_file_name)
@@ -40,7 +44,6 @@ def nature_ny_graph(
     tree_row = ny_data.query('r == 0').iloc[0]
     from indexes import GraphRel
     rel = GraphRel.reliability_polynomial(tree_row.graph, max_fail=1, sources=tree_row.sources)
-    print(f"{rel=}")
     net_plot(tree_row.graph, ax=ax, sources=tree_row.sources, basemap=True)
 
     # tree MCMCM
@@ -121,10 +124,10 @@ def nature_ny_graph(
         
 
 def ring_p_vs_f_zoom(
-    new_york_file_name=NEW_YORK_FILE_NAME,
+    new_york_file_name: str = NEW_YORK_FILE_NAME,
     xmax: float = 1.5e-5,
-    save=False,
-):
+    save: bool = False,
+) -> tuple[plt.Figure, plt.Axes]:
     """Separate figure: ring network P vs F, simple lineplot zoomed to xmax on both axes."""
     ny_data = rw.read_nxjson(new_york_file_name)
 
@@ -193,15 +196,15 @@ def ring_p_vs_f_zoom(
         
 
 def make_figure_layout(
-    figsize=(15, 15),
-    big_ratio=1.3,
-    group_gap=0.35,
-    inter_group_gap=0.3,
-    row2_wspace=0.35,
-    row3_wspace=0.35,
-    top_hspace=0.25,
-    label_style=None,
-):
+    figsize: tuple = (15, 15),
+    big_ratio: float = 1.3,
+    group_gap: float = 0.35,
+    inter_group_gap: float = 0.3,
+    row2_wspace: float = 0.35,
+    row3_wspace: float = 0.35,
+    top_hspace: float = 0.25,
+    label_style: dict = None,
+) -> tuple[plt.Figure, dict]:
     """
     Layout:
       Row 1: two groups, each group is 2x2 with left axis spanning two rows.
@@ -282,9 +285,10 @@ def make_figure_layout(
 
 ##### line graphs ####
 def p_vs_f_lineplot(
-    data: pd.DataFrame, r_list: list, ax, color=GREEN, r_text_ha='center', xmax: float=None,
-    palette: list=None,
-):
+    data: pd.DataFrame, r_list: list, ax: plt.Axes, color: str = GREEN, 
+    r_text_ha: str = 'center', xmax: float = None, palette: list = None,
+) -> None:
+    """Plot P vs F lines for specified redundancy values."""
     # if per-r palette not given, fall back to the single color repeated
     _palette = palette if palette is not None else [color]
     # transform data
@@ -294,8 +298,6 @@ def p_vs_f_lineplot(
     ylim = pmax
     # filter
     data_for_plot  = data_for_plot.query('r in @r_list').copy()
-    # min_filterd_saidi = max_val_below(data_for_plot["SAIDI"].values, ylim)
-    # data_for_plot = data_for_plot.query('SAIDI <= @min_filterd_saidi').copy()
     # y=x line
     sns.lineplot(
         x=[0, xlim], y=[0, xlim], linestyle='--', color=GREY, ax=ax, linewidth=LINEWIDTH
@@ -360,8 +362,9 @@ def p_vs_f_lineplot(
     ax.set_ylabel(r"$F$", rotation=90, fontsize=LABEL_SIZE)
 
 def r_vs_f_lineplot(
-    data: pd.DataFrame, p: float, ax, color=GREEN
-):
+    data: pd.DataFrame, p: float, ax: plt.Axes, color: str = GREEN
+) -> None:
+    """Plot Redundancy (R) vs F for a specific p value."""
     data_for_plot = explode_data(data)
     data_for_plot = data_for_plot.query("p == @p")
     # the saidi line
@@ -397,8 +400,8 @@ def r_vs_f_lineplot(
     ax.set_xlabel(r"$R$", fontsize=LABEL_SIZE)
     ax.set_ylabel(r"$F$", rotation=90, fontsize=LABEL_SIZE)
 
-def n_vs_f_lineplot(new_york_asymptotic_file_name: str, p: float, ax):
-    # data = pd.read_pickle(new_york_asymptotic_file_name)
+def n_vs_f_lineplot(new_york_asymptotic_file_name: str, p: float, ax: plt.Axes) -> None:
+    """Plot Network Size (N) vs F for a specific p value."""
     data = rw.read_nxjson(new_york_asymptotic_file_name)
     data_for_plot = explode_data(data)
     # line plot
@@ -556,15 +559,15 @@ def _minimum_spanning_tree(G: nx.Graph) -> nx.Graph:
 def plot_examples(
         graphs: list[nx.Graph],
         ax: plt.Axes,
-        height_ratio: float=1
-):
+        height_ratio: float = 1
+) -> None:
+    """Plot example networks side by side."""
     plot_graphs_side_by_side(graphs, ax)
     lower, upper = ax.get_ylim()
     r = (2 - height_ratio)
     new_upper = (1 - r) * lower + r * upper
     new_lower = r * lower + (1 - r) * upper
     ax.set_ylim(new_lower, new_upper)
-    # ax.set_ylim(lower * 1.05 - 0.05 * new_upper, new_upper)
 
     
 
@@ -616,7 +619,8 @@ def draw_convex_hull_background(
     ))
     return poly_xy
 
-def net_plot_polygon(graph: nx.Graph, ax, pad: float=0.05):
+def net_plot_polygon(graph: nx.Graph, ax: plt.Axes, pad: float = 0.05) -> None:
+    """Draw network on a polygon."""
     # draw network
     pos = nx.get_node_attributes(graph, "pos")
     draw_network(
@@ -642,13 +646,11 @@ def net_plot_polygon(graph: nx.Graph, ax, pad: float=0.05):
         zorder=100,
     )
 
-    # Limits
-    # set_xy_limits_from_pos(ax, pos, pad=pad)
-
 def plot_graphs_side_by_side(
         graphs: list[nx.Graph],
         ax: plt.Axes
-):
+) -> None:
+    """Plot multiple graphs side by side within the same axes."""
     all_points = np.array([data["pos"] for graph in graphs for _, data in graph.nodes.items()])
     xmin = all_points[:, 0].min()
     xmax = all_points[:, 0].max()
@@ -685,8 +687,9 @@ def plot_graphs_side_by_side(
 def reliability_MCMC_plot(
     r: float,
     data_file_name: str,
-    ax: plt.Axes=None,
-):
+    ax: plt.Axes = None,
+) -> None:
+    """Plot reliability SAIDI metric over time from MCMC simulation."""
     # read data
     data = rw.read_nxjson(data_file_name)
     data = data[data["r"] == r].copy()
@@ -732,12 +735,9 @@ def reliability_MCMC_plot(
     ax.set_yscale('log')
     ax.set_xticks(list(range(0, int(t_max) + 1, 100))[1:])
     ax.set_ylim([ymin, ax.get_ylim()[1]])
-    # ax.tick_params(axis='x', which='major', labelsize=TICK_SIZE)
     ax.set_xlabel('days', fontsize=LABEL_SIZE)
     ax.set_ylabel(r'$F$', rotation=90, fontsize=LABEL_SIZE)
-    # ax.legend().set_visible(Trues)
     configure_axes(ax)
-    # style_sns_legend(ax, reverse=True)
 
 
 def resample_cum_saidi(df: pd.DataFrame, dt: float):

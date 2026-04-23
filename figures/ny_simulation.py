@@ -7,18 +7,13 @@ import geopandas as gpd
 import indexes.simulation as sm
 from scipy.spatial.distance import squareform, pdist
 from scipy.spatial import Voronoi
-# from python_tsp.heuristics import solve_tsp_lin_kernighan
 from utilities.lkh_tsp import solve_tsp_lin_kernighan
 from indexes import GraphRel, edge_probs_by_length, Float
-import random
-from itertools import combinations
-from tqdm import tqdm
 from typing import Literal
 import utilities.read_write as rw
 from utilities.figures_utilities import saidi_with_lengths, failing_rate_from_spanning_tree
 from figures.ny_plot import NEW_YORK_FILE_NAME, NEW_YORK_ASYMPTOTIC_FILE_NAME, NEW_YORK_MCMC_FILE_NAME
 from indexes.simulation import simulate_rel
-type Edge = tuple[int]
 
 
 
@@ -30,7 +25,7 @@ def ny_graph_simulation(file_name: str=NEW_YORK_FILE_NAME) -> pd.DataFrame:
     and add random redundant edges
     the SAIDI is computed using MCMC Simulations
     """
-    manhattan_polygon = get_polygons_for_simulations()[0]
+    manhattan_polygon = get_polygon_for_simulations()
     p_list = sorted(
         [0.0, 5e-6, 7e-6] +
         list(np.round(np.arange(2e-5, 1e-4+5e-6, 1e-5), 6)) +
@@ -59,9 +54,9 @@ def ny_graph_simulation(file_name: str=NEW_YORK_FILE_NAME) -> pd.DataFrame:
 def ny_asymptotic_graph_simulation(file_name: str=NEW_YORK_ASYMPTOTIC_FILE_NAME) -> pd.DataFrame:
     """Generate asymptotic simulations by increasing network size per slice.
 
-    Uses the same deterministic RNG pattern as ``.
-ny_graph_simulation    """
-    nyc__polygon = get_polygons_for_simulations()[0]
+    Uses the same deterministic RNG pattern as ``ny_graph_simulation``.
+    """
+    nyc__polygon = get_polygon_for_simulations()
     p_list = [5e-4]
 
     # use the same style: define a top-level RNG and pass it downward
@@ -83,40 +78,15 @@ ny_graph_simulation    """
     return df
 
 
-def generate_data_reliability_simulation_plot(
-    file_name: str,
-    manhattan_file_name: str,
-    rng: np.random.Generator,
-) -> pd.DataFrame:
-    """Generate reliability simulation data for plotting using provided RNG.
 
-    Loads a network from the Manhattan dataset and simulates reliability
-    for multiple p values, then saves the results to a CSV file.
+def get_polygon_for_simulations() -> Polygon:
     """
-    ny_data = rw.pd_read_json(manhattan_file_name)
-    graph = ny_data.query('r == 0').graph.iloc[0]
-    data = sm.simulate_reliability_multi_p(
-        graph,
-        p_list=[1e-2, 1e-3, 1e-4],
-        source=0,
-        mean_time_to_repair=0.2,
-        T=365 * 1 + 1,
-        dt=0.05,
-        rng=rng,
-        file_name=file_name,
-    )
-    return data
-
-
-def get_polygons_for_simulations() -> list[Polygon]:
-    """
-    Load Manhattan and NYC polygons from GeoJSON files.
+    Load Manhattan polygon from GeoJSON files.
     
     Returns
     -------
-    list[Polygon]
-        Tuple of (manhattan_polygon, nyc_polygon) for network generation.
-        NYC polygon is a MultiPolygon union of all NYC borough geometries.
+    Polygon
+        Manhattan polygon
     """
     # Load Manhattan polygon from GeoJSON
     manhattan_poly_file = r"data\ny\manhattan.geojson"
@@ -124,7 +94,7 @@ def get_polygons_for_simulations() -> list[Polygon]:
     gdf['area'] = gdf.area
     manhattan_polygon = gdf.to_crs(4326).loc[gdf.area.idxmax()].geometry
     # nyc
-    return (manhattan_polygon, )
+    return manhattan_polygon
 
 
 ##### MCMC simulation ####
@@ -417,10 +387,32 @@ def _saidi_using_simulation(
         p_list: list[float],
         sources: list,
         rng: np.random.Generator,
-        p_rate: float | None=None,
+        p_rate: float | None = None,
     ) -> dict[float, dict[Literal["p_rate", "saidi"], float]]:
+    """
+    Compute SAIDI values for a list of failure probabilities.
+    
+    Parameters
+    ----------
+    G : nx.Graph
+        The network graph.
+    p_list : list[float]
+        List of failure probabilities.
+    sources : list
+        List of source nodes.
+    rng : np.random.Generator
+        Random number generator.
+    p_rate : float | None, optional
+        Pre-computed p_rate.
+        
+    Returns
+    -------
+    dict
+        Dictionary mapping p to computed p_rate and SAIDI values.
+    """
     res_dict = {}
     for p in p_list:
+        # infer the p_rate from the input mean_p
         p_rate = edge_probs_by_length(G, p=p, mode="mean", tol=1e-6, max_iter=50)[1]
         saidi = saidi_with_lengths(G, sources=sources, p=p_rate, mode="rate", rng=rng, show_progress=False, mean_cycle_days=0.1)
         res_dict[p] = {"p_rate": p_rate, "saidi": saidi}
@@ -429,7 +421,7 @@ def _saidi_using_simulation(
 
 ##### improve network #####
 
-def _random_edges_by_dist(G: nx.Graph, rng: np.random.Generator) -> list[tuple]:
+def _get_random_candidate_edges(G: nx.Graph, rng: np.random.Generator) -> list[tuple]:
     """Return a randomly shuffled list of candidate edges using `rng`.
 
     Parameters
@@ -480,7 +472,7 @@ def random_improve_network(
         Dictionary mapping redundancy r to improved graph copies
     """
     # Get candidate edges (randomly shuffled by provided generator)
-    candidate_edges = _random_edges_by_dist(base_graph, rng=rng)
+    candidate_edges = _get_random_candidate_edges(base_graph, rng=rng)
 
     if len(candidate_edges) == 0:
         return {}
@@ -610,7 +602,7 @@ def _minimum_spanning_tree(points: np.array, rng: np.random.Generator) -> nx.Gra
 
 
 
-def _base_ring_from_points(points: np.array, time_limit: float=None):
+def _base_ring_from_points(points: np.array, time_limit: float=None) -> nx.Graph:
     """
     Create a cycle (ring) graph by solving the Traveling Salesman Problem.
     
