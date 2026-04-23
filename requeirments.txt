@@ -1,0 +1,57 @@
+numpy
+pandas
+scipy
+networkx
+matplotlib
+tqdm
+ipywidgets
+jupyterlab
+
+# GIS / Geospatial
+geopandas
+shapely
+pyproj
+contextily
+rasterio
+folium
+osmnx
+libpysal
+
+# Optimization
+gurobipy
+python-tsp
+
+
+# Power systems & electrical networks
+pandapower
+
+# Graph & scientific tools
+numba
+duckdb
+polars
+pyarrow
+
+# Machine learning
+joblib
+
+# Visualization
+plotly
+seaborn
+
+# Trajectory & geometry
+geopy
+
+
+# GUI
+pywebview
+
+# Utilities
+requests
+python-dotenv
+pydantic
+icecream
+
+# data
+topohub
+epyt
+boto3
