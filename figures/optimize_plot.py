@@ -8,7 +8,7 @@ from matplotlib.patches import Polygon
 import networkx as nx
 from typing import List, Tuple, Dict
 import optimal_network as ON
-import utilities.crisp as CRISP
+import optimal_network.other_methods.improve_tree as IT
 import pandas as pd
 from scipy.spatial.distance import pdist, squareform
 import utilities.read_write as rw
@@ -23,7 +23,6 @@ from utilities.helper import draw_network
 from indexes.utilities import create_sparse_graph
 from indexes.utilities import get_skeleton_graph
 from indexes.probs import Poly
-# from indexes.simulation import simulate_reliability_multi_p, saidi_using_simulation
 from tqdm import tqdm
 
 NODES_LINEWIDTH = 1.5
@@ -659,13 +658,18 @@ def simulate_netowrks(file_path: str) -> tuple[pd.DataFrame, np.array, float]:
     rng = np.random.default_rng(seed)
     points, graph = random_points(n=n, r=r, seed=seed)
 
-    # simulate trees
+    # simulate tree
     p_rate = failing_rate_from_spanning_tree(points, p_mean=5e-4)
-    trees = []
-    for i in range(3):
-        subgraph = CRISP.add_edges_to_random_tree(graph, r=r, seed=seed * (i+1), tree_factor=0.1)
-        trees.append([subgraph, "trees", i, get_saidi(subgraph, p_rate=p_rate, rng=rng)])
-        print(f"Simulate tree ({i+1}/3)")
+    
+    tree = nx.minimum_spanning_tree(graph, weight="weight")
+    subgraph, _ = IT.improve_tree(tree, R=r, root=0, weight_quantile=1)
+    
+    # Tag edges for plotting
+    for e in subgraph.edges:
+        subgraph.edges[e]["source"] = "tree" if e in tree.edges else "chord"
+        
+    trees = [[subgraph, "trees", 0, get_saidi(subgraph, p_rate=p_rate, rng=rng)]]
+    print("Simulate tree")
 
     # simulate non-optimal 2-connected
     non_optimals = []

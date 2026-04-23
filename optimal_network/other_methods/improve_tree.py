@@ -33,7 +33,7 @@ def improve_tree(G_tree: nx.Graph, R: int, root, weight_quantile: float=1, show_
     selected = []
     scores = edge_scores.copy()
 
-    progress = lambda x: tqdm(x, desc="improve tree") if show_progress else lambda x: x
+    progress = lambda x: tqdm(x, desc="improve tree") if show_progress else x
     for i in progress(list(range(R))):
         toc()
         best_chord, best_ratio = None, 0
