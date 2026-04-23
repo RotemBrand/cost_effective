@@ -2,19 +2,11 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-from indexes.probs import Poly
+from indexes.probs import Poly, Array
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 from indexes.utilities import create_sparse_graph
 import networkx as nx
-import matplotlib as mpl
-import string
-from indexes.graph_rel import GraphRel
-from indexes.probs import Poly
-from tqdm import tqdm
-import os
-from typing import List, Tuple
 import figures.ny_simulation as NY
-import geopandas as gpd
 import utilities.read_write as rw
 from tqdm import tqdm
 from pathlib import Path
@@ -27,7 +19,6 @@ from utilities.figures_utilities import (
 )
 from indexes import GraphRel
 from utilities import draw_network
-from indexes.probs import Array
 
 tqdm.pandas()
 
@@ -40,21 +31,23 @@ MARKER_WIDTH = 1.5
 
 ############ plot ############
 def nature_topologies_graph(
-        trees_file: Path=DATA_FOLDER / "trees.nxjson",
-        rings_file: Path=DATA_FOLDER / "rings.nxjson",
-        rings_poly_file: Path=DATA_FOLDER / "poly_data.nxjson",
-        regular_file: Path=DATA_FOLDER / "regulars.nxjson",
+        trees_file: Path = DATA_FOLDER / "trees.nxjson",
+        rings_file: Path = DATA_FOLDER / "rings.nxjson",
+        rings_poly_file: Path = DATA_FOLDER / "poly_data.nxjson",
+        regular_file: Path = DATA_FOLDER / "regulars.nxjson",
         save: bool = False,
-):
-    # configure text
-
+) -> np.ndarray:
+    """
+    Generate the main topologies figure.
+    
+    Creates a 3x3 subplot grid analyzing tree, ring, and 3-regular graph topologies.
+    """
     # read data
     trees = rw.read_nxjson(trees_file)
     rings = rw.read_nxjson(rings_file)
     rings_poly = rw.read_nxjson(rings_poly_file)
     print(rings_poly.index)
     regulars = rw.read_nxjson(regular_file)
-    # regulars = read_df_from_pickle(regular_file)
     # create figure
     fig, axs = plt.subplots(
         3, 3, figsize=(3*10/ cm_to_inch, 3*10/ cm_to_inch), gridspec_kw={'hspace': 0.4, 'wspace': 0.5}
@@ -96,13 +89,10 @@ def nature_topologies_graph(
     save_selected_trees(trees, plot_idx=plot_idx, save=save)
     return axs
 
-def empty_axes_with_color(ax, color, title):
+def empty_axes_with_color(ax: plt.Axes, color: str, title: str) -> None:
+    """Clear an axis and set a colored title on the y-axis."""
     for spine in ax.spines.values():
         spine.set_visible(False)
-    #     spine.set_color(color)
-    #     spine.set_linewidth(LINE_WIDTH - 1)
-    #     spine.set_capstyle('round')
-    #     spine.set_joinstyle('round')
     ax.set_xticks([])
     ax.set_yticks([])
     ax.set_ylabel(title, fontsize=TEXT_SIZE, color=color)
@@ -110,7 +100,9 @@ def empty_axes_with_color(ax, color, title):
     ax.yaxis.set_label_position('left')
 
 LETTERS = ['a', 'b', 'c' ,'d', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r']
-def number_plots(axs, start: int=0):
+
+def number_plots(axs: np.ndarray, start: int = 0) -> None:
+    """Add letter labels (a, b, c...) to each subplot."""
     for i, ax in enumerate(axs.flatten()):
         ax.text(
             -0.04, 1.0, f"{LETTERS[start + i]}",
@@ -121,7 +113,8 @@ def number_plots(axs, start: int=0):
 
 
 ###### saidi ####
-def get_saidi(graph: nx.Graph, sources: list[int], p_list: list[float], rng: np.random.Generator, mean_cycle_days=0.5) -> list[float]:
+def get_saidi(graph: nx.Graph, sources: list[int], p_list: list[float], rng: np.random.Generator, mean_cycle_days: float = 0.5) -> list[float]:
+    """Calculate SAIDI values for a graph over a list of failure probabilities."""
     edges_prob = {e: Array(p_list) for e in graph.edges}
     gr = GraphRel(graph, sources=sources, edges_prob=edges_prob)
     res = gr.calc_rel_simulation(T_days=365*5, mean_cycle_days=mean_cycle_days, rng=rng, show_progress=False)
@@ -130,12 +123,12 @@ def get_saidi(graph: nx.Graph, sources: list[int], p_list: list[float], rng: np.
 
 ###### trees #####
 ### plot ###
-def plot_trees_rel(trees: pd.DataFrame, plot_idx: list, ax=None):
+def plot_trees_rel(trees: pd.DataFrame, plot_idx: list, ax: plt.Axes = None) -> None:
+    """Plot reliability F vs p for various tree topologies."""
     if ax is None:
         ax = plt.gca()
     # plot trees rel points
     upper = 1e-2 * 1.2
-    # trees['color'] = pd.Series(trees.index.isin(plot_idx)).map({True: Red, False: Red})
     trees['size'] = pd.Series(trees.index.isin(plot_idx)).map({True: 150, False: 50})
     trees_ = trees.query('saidi < @upper').sort_values('size')
     sns.scatterplot(
@@ -149,7 +142,6 @@ def plot_trees_rel(trees: pd.DataFrame, plot_idx: list, ax=None):
         facecolor=['white' if idx in plot_idx else 'none' for idx in trees_.index],
         edgecolor=RED,
         linewidth=MARKER_WIDTH,
-        # c=trees_['color'],
         ax=ax
     )
     sns.lineplot(
@@ -169,7 +161,8 @@ def plot_trees_rel(trees: pd.DataFrame, plot_idx: list, ax=None):
     set_custom_scientific_format(ax, axis='both', factor=-3)
     configure_axes(ax)
 
-def save_selected_trees(trees: pd.DataFrame, plot_idx: list, save: bool=False):
+def save_selected_trees(trees: pd.DataFrame, plot_idx: list, save: bool = False) -> None:
+    """Save selected tree graphs as SVG files."""
     selected_trees = trees.loc[plot_idx]
     selected_trees.sort_values('p', inplace=True)
     for i, (_, row) in enumerate(selected_trees.iterrows()):
@@ -200,7 +193,8 @@ def save_selected_trees(trees: pd.DataFrame, plot_idx: list, save: bool=False):
 
         
 
-def plot_avg_d_rel(trees: pd.DataFrame, ax=None):
+def plot_avg_d_rel(trees: pd.DataFrame, ax: plt.Axes = None) -> None:
+    """Plot average distance * p vs SAIDI (F)."""
     if ax is None:
         ax = plt.gca()
     # plot avg_d*p vs saidi
@@ -231,7 +225,8 @@ def plot_avg_d_rel(trees: pd.DataFrame, ax=None):
     set_custom_scientific_format(ax, axis='both', factor=-2)
     configure_axes(ax)
 
-def trees_example(ax):
+def trees_example(ax: plt.Axes) -> None:
+    """Plot example tree graphs as inset axes."""
     # generate trees
     star = nx.star_graph(8)
     path = nx.path_graph(6)
@@ -267,21 +262,23 @@ def trees_example(ax):
 
 ### data ###
 
-def generate_tree_data(max_size: int, n_trees: int, seed=42):
+def generate_tree_data(max_size: int, n_trees: int, seed: int = 42) -> pd.DataFrame:
+    """Generate and save simulated reliability data for random trees."""
     trees = create_random_trees(max_size=max_size, n_trees=n_trees, seed=seed)
     trees = simulate_trees_rel(trees)
     # save
     rw.write_nxjson(trees, DATA_FOLDER / "trees.nxjson")
     return trees
 
-def random_dist_from_source(tree, source):
+def random_dist_from_source(tree: nx.Graph, source: int) -> float:
     """
     Returns the average shortest path length from the source to all nodes in the tree.
     """
     lengths = nx.single_source_shortest_path_length(tree, source)
     return np.mean(list(lengths.values()))
 
-def create_random_trees(max_size: int, n_trees: int, seed=42):
+def create_random_trees(max_size: int, n_trees: int, seed: int = 42) -> pd.DataFrame:
+    """Create a dataframe of random tree structures of various types."""
     data = []
     rng = np.random.default_rng(seed)
     for i in range(n_trees):
@@ -314,7 +311,8 @@ def create_random_trees(max_size: int, n_trees: int, seed=42):
     data['avg_d'] = data.apply(lambda row: random_dist_from_source(row['tree'], row['source']), axis=1)
     return data
 
-def simulate_trees_rel(trees: pd.DataFrame):
+def simulate_trees_rel(trees: pd.DataFrame) -> pd.DataFrame:
+    """Simulate reliability SAIDI for a dataframe of trees."""
     rng = np.random.default_rng(356)
     def simulate_saidi(tree, p, source) -> float:
         return get_saidi(tree, sources=[source], p_list=[p], rng=rng)[0]
@@ -324,7 +322,8 @@ def simulate_trees_rel(trees: pd.DataFrame):
 
 ###### rings #####
 ### plot ###
-def plot_ring_rel(poly_data: pd.DataFrame, n_list: list, ax: plt.Axes, pmax: float=5e-3):
+def plot_ring_rel(poly_data: pd.DataFrame, n_list: list, ax: plt.Axes, pmax: float = 5e-3) -> None:
+    """Plot reliability F vs p for ring topologies and their polynomial fits."""
 
     # plot the simulated points
     palette = sns.color_palette("Greens", len(n_list) + 1)[1:]
@@ -395,7 +394,8 @@ def plot_ring_rel(poly_data: pd.DataFrame, n_list: list, ax: plt.Axes, pmax: flo
     set_custom_scientific_format(ax, axis='both', factor=-3)
     configure_axes(ax)
 
-def plot_pc_by_n(poly_data: pd.DataFrame, ax=None):
+def plot_pc_by_n(poly_data: pd.DataFrame, ax: plt.Axes = None) -> None:
+    """Plot critical probability p_c versus network size N for rings."""
     if ax is None:
         ax = plt.gca()
     # plot pc points
@@ -404,7 +404,6 @@ def plot_pc_by_n(poly_data: pd.DataFrame, ax=None):
         x='n',
         y='pc',
         color=GREEN,
-        # label='Simulated',
         marker='o',
         facecolor='white',
         edgecolor=GREEN,
@@ -425,10 +424,8 @@ def plot_pc_by_n(poly_data: pd.DataFrame, ax=None):
         linestyle='-',
         color=GREEN,
         linewidth=LINE_WIDTH,
-        # label='Expected',
         ax=ax,
         label=r'$\sim N^{-2}$'
-        # legend=False
     )
     ax.legend(frameon=False)
     # configure axes
@@ -440,7 +437,8 @@ def plot_pc_by_n(poly_data: pd.DataFrame, ax=None):
 
     configure_axes(ax)
 
-def rings_example(ax):
+def rings_example(ax: plt.Axes) -> None:
+    """Plot example ring graphs as inset axes."""
     # create graphs to plot
     ring = nx.cycle_graph(10)
     strc = nx.complete_graph(4)
@@ -468,7 +466,8 @@ def rings_example(ax):
     
 
 ### data ###
-def generate_rings_data(n_list, p_num: int):
+def generate_rings_data(n_list: list, p_num: int) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Generate and save simulated reliability data for ring topologies."""
     # generate trees data
     rings = simulate_rings_criticality(n_list, p_num)
     # Fit degree 2 polynomial for each n
@@ -491,7 +490,8 @@ def generate_rings_data(n_list, p_num: int):
     rw.write_nxjson(poly_data, DATA_FOLDER / "poly_data.nxjson")
     return rings, poly_data
 
-def simulate_rings_criticality(n_list, p_num: int) -> pd.DataFrame:
+def simulate_rings_criticality(n_list: list, p_num: int) -> pd.DataFrame:
+    """Simulate ring reliability for a range of probabilities to find criticality."""
     data = []
     rng = np.random.default_rng(1000)
     for n in tqdm(n_list):
@@ -505,7 +505,7 @@ def simulate_rings_criticality(n_list, p_num: int) -> pd.DataFrame:
     data_exploded = data.explode(['p', 'saidi'])
     return data_exploded
 
-def get_y_is_x_point(coeff):
+def get_y_is_x_point(coeff: list) -> float | None:
     """
     Find the point where the polynomial intersects the line y=x.
     """
@@ -522,7 +522,8 @@ def get_y_is_x_point(coeff):
 
 ###### 3reg #####
 ### plot ###
-def plot_regular_rel(regulars: pd.DataFrame, n_list: list, ax=None):
+def plot_regular_rel(regulars: pd.DataFrame, n_list: list, ax: plt.Axes = None) -> None:
+    """Plot reliability F vs p for 3-regular graph topologies."""
     if ax is None:
         ax = plt.gca()
 
@@ -541,18 +542,11 @@ def plot_regular_rel(regulars: pd.DataFrame, n_list: list, ax=None):
         hue='n',
         hue_order=n_list[::-1],
         marker='o',
-        # markersize=10,
-        # markeredgecolor ='none',
-        # fillstyle='none',
         palette=palette,
         linewidth=LINE_WIDTH,
         linestyle='-',
         ax=ax
     )
-    # --- post-process markers ---
-    # for line in ax.lines:
-    #     line.set_markerfacecolor("none")
-    #     line.set_markeredgecolor(line.get_color())
     # plot F=p
     sns.lineplot(
         x=[0, pmax],
@@ -580,7 +574,8 @@ def plot_regular_rel(regulars: pd.DataFrame, n_list: list, ax=None):
     ax.get_legend().set_visible(False)
     configure_axes(ax)
 
-def plot_regular_rel_by_n(regulars: pd.DataFrame, ax=None):
+def plot_regular_rel_by_n(regulars: pd.DataFrame, ax: plt.Axes = None) -> None:
+    """Plot reliability F versus network size N for 3-regular graphs."""
     if ax is None:
         ax = plt.gca()
     
@@ -622,7 +617,8 @@ def plot_regular_rel_by_n(regulars: pd.DataFrame, ax=None):
     set_custom_scientific_format(ax, axis='y', factor=-4)
     configure_axes(ax)
 
-def regulars_example(ax):
+def regulars_example(ax: plt.Axes) -> None:
+    """Plot example 3-regular graphs as inset axes."""
     # create graphs to plot
     regular = nx.random_regular_graph(d=3, n=30, seed=803)
     # plot graph
@@ -643,8 +639,9 @@ def regulars_example(ax):
 
 ### data ###
 def generate_random_regular_data(
-        seed: int=42, new_york_asymptotic_file_name: str=NEW_YORK_ASYMPTOTIC_FILE_NAME
+        seed: int = 42, new_york_asymptotic_file_name: str = NEW_YORK_ASYMPTOTIC_FILE_NAME
     ) -> pd.DataFrame:
+    """Generate and save simulated reliability data for 3-regular networks."""
     ny_data = rw.read_nxjson(new_york_asymptotic_file_name)
     ny_data.drop_duplicates("n", inplace=True)
 

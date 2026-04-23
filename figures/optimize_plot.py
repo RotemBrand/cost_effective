@@ -36,10 +36,11 @@ WSPACE = 0.02
 ###### plot ######
 
 def optimal_algorithm_plot(
-        simulation_path: str=r"data/optimize_plot.nxjson",
-        simulation_opt_path: str=r"data/optimize_plot_opt.nxjson",
-        save: bool=False,
-    ):
+        simulation_path: str = r"data/optimize_plot.nxjson",
+        simulation_opt_path: str = r"data/optimize_plot_opt.nxjson",
+        save: bool = False,
+    ) -> None:
+    """Generate the full optimization comparison figure."""
     import matplotlib as mpl
 
     mpl.rcParams["font.family"] = "sans-serif"
@@ -113,7 +114,8 @@ def optimal_algorithm_plot(
         save_axs_without_text(axs_row, r'C:\Users\rotem\Desktop\מסמכים\תואר\תזה\write\baruch\optimize_plot\optimize_plot\axes')
 
 # iluustrations
-def draw_illustration(ax) -> Tuple[Tuple]:
+def draw_illustration(ax: plt.Axes) -> tuple[tuple, tuple]:
+    """Draw the structure graph illustration."""
     graph = create_illustrative_graph()
     comps = list(nx.k_edge_components(graph, 2))
     node_to_color = {
@@ -149,7 +151,8 @@ def draw_illustration(ax) -> Tuple[Tuple]:
     add_legend_to_illustration(ax)
     return ax.get_xlim(), ax.get_ylim()
 
-def add_legend_to_illustration(ax):
+def add_legend_to_illustration(ax: plt.Axes) -> None:
+    """Add a legend for trees, chains, and forks to the illustration."""
     from matplotlib.lines import Line2D
     legend_elements = [
         Line2D([0], [0], color=RED,   lw=3, label='Trees'),
@@ -172,7 +175,8 @@ def _key(e: tuple) -> tuple:
         return tuple(sorted(e))
     return (*sorted(e[:2]), e[2])
 
-def draw_illustration_strc(ax: plt.Axes, xlim: tuple=None):
+def draw_illustration_strc(ax: plt.Axes, xlim: tuple = None) -> None:
+    """Draw the skeleton structure for the illustration graph."""
     # get graph structure
     graph = create_illustrative_graph()
     comps = list(nx.k_edge_components(graph, 2))
@@ -223,7 +227,8 @@ def draw_illustration_strc(ax: plt.Axes, xlim: tuple=None):
     ax.set_ylim(ymin - (ymax - ymin) * 0.1, ymax)
 
 
-def draw_chains_illustrations(ax):
+def draw_chains_illustrations(ax: plt.Axes) -> None:
+    """Draw the individual chains for the illustration."""
     lengths = [6, 3, 6, 1]
     max_length = max(lengths)
     xmax = max_length + 2
@@ -259,7 +264,8 @@ def draw_chains_illustrations(ax):
         ax.set_ylim((0, len(lengths) + 1))
 
 # Explain the method
-def draw_building_method(draw_clusters: bool, draw_strc: bool, draw_graph: bool, with_colors: bool, ax):
+def draw_building_method(draw_clusters: bool, draw_strc: bool, draw_graph: bool, with_colors: bool, ax: plt.Axes) -> None:
+    """Draw the steps for constructing the optimal network (clustering, strc, full graph)."""
     r = 4
     n = 100
     seed=42
@@ -359,7 +365,8 @@ def draw_building_method(draw_clusters: bool, draw_strc: bool, draw_graph: bool,
 
 
 # examples
-def draw_tree_graph(tree: nx.Graph, ax):
+def draw_tree_graph(tree: nx.Graph, ax: plt.Axes) -> None:
+    """Draw a tree graph."""
     draw_network(
         graph=tree,
         edge_color=[RED if d['source'] == "tree" else BLUE for e, d in tree.edges.items()],
@@ -369,7 +376,8 @@ def draw_tree_graph(tree: nx.Graph, ax):
         ax=ax,
     )
 
-def draw_2con_optimal(graph: nx.Graph, ax, width: float=WIDTH, chain_color=GREEN, arc_edges: bool=False):
+def draw_2con_optimal(graph: nx.Graph, ax: plt.Axes, width: float = WIDTH, chain_color: str = GREEN, arc_edges: bool = False) -> None:
+    """Draw a 2-connected optimal graph or structure."""
     draw_network(
         graph=graph,
         node_color='white',
@@ -384,7 +392,8 @@ def draw_2con_optimal(graph: nx.Graph, ax, width: float=WIDTH, chain_color=GREEN
     )
 
 
-def draw_fr_line(data_opt: pd.DataFrame, ax):
+def draw_fr_line(data_opt: pd.DataFrame, ax: plt.Axes) -> None:
+    """Draw the F vs R line for the optimal graphs."""
     r = data_opt["r"].values.astype('float')
     f = data_opt["saidi"].values.astype('float')
     sns.lineplot(x=[0, max(r)], y=0, ax=ax, color='black', linewidth=LINE_WIDTH, zorder=0)
@@ -404,7 +413,8 @@ def draw_fr_line(data_opt: pd.DataFrame, ax):
     ax.tick_params(axis='both', colors=BLUE)
     configure_axes(ax)
 
-def add_arrow(ax, x, y, l):
+def add_arrow(ax: plt.Axes, x: float, y: float, l: float) -> FancyArrowPatch:
+    """Add a horizontal arrow to the plot."""
     arrow = FancyArrowPatch(
         (x, y), (x + l, y),
         transform=ax.transAxes,
@@ -421,7 +431,8 @@ def add_arrow(ax, x, y, l):
     return arrow
 
 # plot trees
-def plot_tree_row(ax_row: list[plt.Axes], data: pd.DataFrame):
+def plot_tree_row(ax_row: list[plt.Axes], data: pd.DataFrame) -> None:
+    """Plot the row of tree graphs."""
 
     ## trees ##
     original_graph = data.loc[("graph", 0)]["graph"]
@@ -458,8 +469,8 @@ def plot_tree_row(ax_row: list[plt.Axes], data: pd.DataFrame):
     for spine in ax.spines.values():
         spine.set_visible(False)
 
-def plot_non_optimal_row(ax_row: list[plt.Axes], data: pd.DataFrame):
-    """Plot the row of the non optimal graphs"""
+def plot_non_optimal_row(ax_row: list[plt.Axes], data: pd.DataFrame) -> None:
+    """Plot the row of the non optimal graphs."""
     # plot graphs
     non_optimal = data.loc[("non_optimals", slice(None))]
     non_optimal["sigma"] = non_optimal["graph"].apply(_get_effective_sigma)
@@ -501,28 +512,10 @@ def plot_non_optimal_row(ax_row: list[plt.Axes], data: pd.DataFrame):
         ax.spines[spine].set_visible(False)
     
 
-    # # bar plot
-    # ax = ax_row[3]
-    # sigmas = non_optimal["sigma"].values
-    # values = non_optimal["saidi"].values
-    # x = np.arange(len(sigmas))
-    # bars = ax.bar(x, values, color=BLUE, width=0.8)
-    
-    # # add value text on top of bars
-    # for bar, val in zip(bars, values):
-    #     ax.text(
-    #         bar.get_x() + bar.get_width() / 2, bar.get_height(),
-    #         format_p_scientific(val),
-    #         ha="center", va="bottom",
-    #         color=BLUE, fontsize=TEXT_SIZE,
-    #     )
-
-    # # format ax
-    # ax.set_yticks([])
-    # ax.set_ylim((0, max(values) * 1.3))
     configure_axes(ax)
 
-def plot_optimal_row(ax_row: list[plt.Axes], data: pd.DataFrame, data_opt: pd.DataFrame):
+def plot_optimal_row(ax_row: list[plt.Axes], data: pd.DataFrame, data_opt: pd.DataFrame) -> None:
+    """Plot the row of the optimal graphs."""
     optimal_row = data.loc[("optimal", 0)]
 
     # plot graph
@@ -540,7 +533,8 @@ def plot_optimal_row(ax_row: list[plt.Axes], data: pd.DataFrame, data_opt: pd.Da
     # optimal f vs f
     draw_fr_line(data_opt, ax_row[2])
 
-def _get_effective_sigma(graph: nx.Graph):
+def _get_effective_sigma(graph: nx.Graph) -> float:
+    """Calculate the effective standard deviation of the chain lengths."""
     # get lengths
     for e in graph.edges:
         graph.edges[e]["length"] = np.linalg.norm(
@@ -559,24 +553,9 @@ def _get_effective_sigma(graph: nx.Graph):
 
 
 # plot utils
-def saidi_to_str(saidi: list):
-    s = ""
-    is_first=True
-    for i, c in enumerate(saidi):
-        if c == 0:
-            continue
-        if not is_first:
-            s += "+"
-        x = f"p^{i}" if i > 1 else "p" if i == 1 else ""
-        if int(c) == 1:
-            s += x
-        else:
-            s += f"{int(c)}{x}"
-        is_first = False
-    return s
 
 def make_ax_row(
-    ax_main,
+    ax_main: plt.Axes,
     n_axs: int,
     margin: float = 0.0,
     wspace: float | list[float] = WSPACE,
@@ -640,7 +619,8 @@ def make_ax_row(
     return axs
 
 LETTERS = ['a', 'b', 'c' ,'d', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o']
-def number_plots(ax_row: list, start: int=0):
+def number_plots(ax_row: list[plt.Axes], start: int = 0) -> None:
+    """Add letter labels (a, b, c...) to a row of subplots."""
     for i, ax in enumerate(ax_row):
         ax.text(
             -0.03, 1.05, f"{LETTERS[start + i]}",
@@ -649,7 +629,8 @@ def number_plots(ax_row: list, start: int=0):
             transform=ax.transAxes,
         )
 
-def plot_line_with_title(ax, title: str, color):
+def plot_line_with_title(ax: plt.Axes, title: str, color: str) -> None:
+    """Plot a vertical line with a title text on the given axis."""
     xlim = ax.get_xlim()
     ylim = ax.get_ylim()
     x = xlim[0] - (xlim[1] - xlim[0]) *  0.07
@@ -668,7 +649,8 @@ def plot_line_with_title(ax, title: str, color):
 
 ###### simulations ######
 
-def simulate_netowrks(file_path: str):
+def simulate_netowrks(file_path: str) -> tuple[pd.DataFrame, np.array, float]:
+    """Simulate reliability for random trees, non-optimal, and optimal networks."""
     n = 1000
     r = 10
     c = int((n - 2 * (r - 1)) / (3 * (r - 1)))
@@ -753,31 +735,14 @@ def simulate_opt_networks(p_rate: float, points: np.array, file_name: str=r"plot
 
 
 
-def construct_optimal_graph(n:int, r: int):
-        # build strc
-        n_strc = 2 * (r - 1)
-        if r == 1:
-            strc = nx.from_edgelist([(0, 0)])
-        elif r == 2:
-            strc = nx.from_edgelist([(0, 1), (0, 1), (0, 1)], create_using=nx.MultiGraph)
-        else:
-            strc = nx.cycle_graph(n_strc)
-            for i in range(n_strc // 2):
-                strc.add_edge(i, (i + n_strc // 2) % n_strc)
-        n_strc, m_strc = strc.number_of_nodes(), strc.number_of_edges()
-        c, n_long_chains = divmod(n - n_strc, m_strc)
-        # graph
-        lengths = [c + 1 if i < n_long_chains else c for i in range(m_strc)]
-        graph = create_sparse_graph(strc, dict(zip(strc.edges, lengths)))
-        return graph
-
 def get_saidi(G: nx.Graph, p_rate: float, rng: np.random.Generator) -> list:
     # source = next(iter([node for node, d in G.degree if d == 3]))
     source = 0
     saidi = saidi_with_lengths(G, sources=[source], p=p_rate, mode="rate", rng=rng, mean_cycle_days=0.5)
     return saidi
 
-def random_points(n: int, r: int, seed:int=None):
+def random_points(n: int, r: int, seed: int = None) -> tuple[np.array, nx.Graph]:
+    """Generate random points and build a base proximity graph."""
     # create data
     rng = np.random.default_rng(seed)
     points = rng.random((n, 2))
@@ -835,7 +800,8 @@ def create_illustrative_graph() -> nx.Graph:
 
 
 ##### text ###
-def add_text(axs: list[list[plt.Axes]]):
+def add_text(axs: list[list[plt.Axes]]) -> None:
+    """Add text annotations to the axes."""
     # b
     ax = axs[0][1]
     ax.text(
