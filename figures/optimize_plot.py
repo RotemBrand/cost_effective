@@ -656,13 +656,13 @@ def simulate_netowrks(file_path: str) -> tuple[pd.DataFrame, np.array, float]:
     print(f"c = {c}")
     seed=42
     rng = np.random.default_rng(seed)
-    points, graph = random_points(n=n, r=r, seed=seed)
+    points, graph = random_points(n=n, seed=seed)
 
     # simulate tree
     p_rate = failing_rate_from_spanning_tree(points, p_mean=5e-4)
     
     tree = nx.minimum_spanning_tree(graph, weight="weight")
-    subgraph, _ = IT.improve_tree(tree, R=r, root=0, weight_quantile=1)
+    subgraph, _ = IT.improve_tree(tree, R=r+1, root=0, weight_quantile=1)
     
     # Tag edges for plotting
     for e in subgraph.edges:
@@ -710,7 +710,7 @@ def simulate_netowrks(file_path: str) -> tuple[pd.DataFrame, np.array, float]:
     rw.write_nxjson(data, file_path)
     return data, points, p_rate
 
-def simulate_opt_networks(p_rate: float, points: np.array, file_name: str=r"plots/nature/data/graph_five_opt.nxjson") -> pd.DataFrame:
+def simulate_opt_networks(p_rate: float, points: np.array, file_name: str=r"data/graph_five_opt.nxjson") -> pd.DataFrame:
     """Simualte optimal network for each r in range(r_min, r_max, step) and return a df of r and saidi"""
     n = 1000
     r_list = range(1, 11, 1)
@@ -745,7 +745,7 @@ def get_saidi(G: nx.Graph, p_rate: float, rng: np.random.Generator) -> list:
     saidi = saidi_with_lengths(G, sources=[source], p=p_rate, mode="rate", rng=rng, mean_cycle_days=0.5)
     return saidi
 
-def random_points(n: int, r: int, seed: int = None) -> tuple[np.array, nx.Graph]:
+def random_points(n: int, seed: int = None) -> tuple[np.array, nx.Graph]:
     """Generate random points and build a base proximity graph."""
     # create data
     rng = np.random.default_rng(seed)

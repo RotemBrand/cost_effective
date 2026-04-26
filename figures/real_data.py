@@ -12,7 +12,7 @@ from shapely.geometry import LineString
 import json
 from shapely.geometry import shape
 from indexes import GraphRel, get_skeleton_graph, defult_sources, edge_probs_by_length
-from utilities.helper import draw_network
+from utilities import draw_network
 from indexes.simulation import RelType
 from optimal_network import optimal_network_from_points, optimize_rel_weight_ratio, improve_tree
 from scipy.spatial.distance import pdist, squareform
@@ -21,6 +21,7 @@ import utilities.read_write as rw
 
 DATA_PATH = r"data/real_networks.nxjson"
 
+#### plots #####
 
     
     
@@ -231,28 +232,6 @@ def get_optimal_network(graph: nx.Graph, R=None, c_mean=None, **args) -> nx.Grap
     optimal_network = optimal_network_from_points(points, r=R, **final_args)
     return optimal_network
 
-
-def _build_delaunay_graph(G: nx.Graph, ends: list=[]) -> nx.Graph:
-    """Build a sparse geometric graph using Voronoi ridges from node positions.
-
-    The returned graph has edge attribute 'weight' equal to Euclidean distance
-    between connected points. Returns ``None`` if Voronoi computation fails.
-    """
-    from scipy.spatial import Voronoi
-    points = np.array(list(nx.get_node_attributes(G, "pos").values())) 
-    nodes = list(range(len(points)))
-    dist = squareform(pdist(points))
-    try:
-        vor = Voronoi(points)
-    except:
-        return None
-    ends_idx = [nodes.index(end) for end in ends]
-    edges = [(nodes[u], nodes[v], dist[u, v]) for u, v in vor.ridge_points]
-    edges += [(nodes[u], nodes[end], dist[u, end]) for end in ends_idx for u in range(len(nodes))]
-    del_graph = nx.Graph()
-    del_graph.add_weighted_edges_from(edges)
-    nx.set_node_attributes(del_graph, dict(enumerate(points)), "pos")
-    return del_graph
 
 def get_total_weight(G: nx.Graph) -> float:
     """Return total Euclidean length of graph edges using node 'pos' attributes.
@@ -508,14 +487,9 @@ def get_sfo_bounded_network(area: str="P2U", box: str="box") -> nx.Graph:
     boundery = gpd.read_file(fr"{dir}\{box}.geojson").to_crs(3857)
     G = build_mv_network_from_boundery(dir, boundery.to_crs(32610), full_network=False)
     G = nx.edge_subgraph(G, nx.minimum_spanning_tree(G).edges).copy()
-    # G = nx.edge_subgraph(G, nx.minimum_spanning_tree(G, weight="length_m").edges).copy()
     _change_graph_crs(G, old_crs=32610, new_crs=3857)
     G = nx.relabel_nodes(G, dict(zip(G.nodes, range(len(G)))))
     G.graph["sources"] = [node for node, data in G.nodes.items() if data["is_source"]]
-
-    import pickle
-    with open(f"G_{area}.pkl", "wb") as f:
-        pickle.dump(G, f)
 
     return G
 
