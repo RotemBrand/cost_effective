@@ -52,7 +52,7 @@ def real_data_plot(show_basemap: bool=True, show_text: bool=True,  save=False):
     display(
         networks_df[[
             "name", "total_weight", "optimal_network_weight", "N", "M", "R"
-            ,'R_ratio', 'weight_ratio', 'rel_ratio', 'saidi'
+            ,'R_ratio', 'weight_ratio', 'rel_ratio', 'optimal_network_saidi', 'saidi'
             ]]
         )
 

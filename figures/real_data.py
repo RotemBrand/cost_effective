@@ -474,12 +474,12 @@ def get_sfo_networks(improve: bool=False) -> Dict[str, nx.Graph]:
         'SFO Davidson': get_sfo_bounded_network("P3U", "box"),
         'SFO Pacific': get_sfo_bounded_network("P2U", "box2"),
     }
-    if improve:
-        G = networks_dict['SFO Davidson']
-        networks_dict['SFO Davidson'], _ = improve_tree(G, R=6, root=G.graph["sources"][0], weight_quantile=0.3, show_progress=True)
-        
+    if improve:        
         G = networks_dict['SFO Pacific']
         networks_dict['SFO Pacific'], _ = improve_tree(G, R=8, root=G.graph["sources"][0], weight_quantile=0.3, show_progress=True)
+
+        G = networks_dict['SFO Davidson']
+        networks_dict['SFO Davidson'], _ = improve_tree(G, R=6, root=G.graph["sources"][0], weight_quantile=0.3, show_progress=True)
     return networks_dict
 
 def get_sfo_bounded_network(area: str="P2U", box: str="box") -> nx.Graph:
