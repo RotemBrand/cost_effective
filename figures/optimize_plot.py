@@ -8,7 +8,7 @@ from matplotlib.patches import Polygon
 import networkx as nx
 from typing import List, Tuple, Dict
 import optimal_network as ON
-import optimal_network.other_methods.improve_tree as IT
+import optimal_network.other_methods.tree_close_loops as TCL
 import pandas as pd
 from scipy.spatial.distance import pdist, squareform
 import utilities.read_write as rw
@@ -655,18 +655,13 @@ def simulate_netowrks(file_path: str) -> tuple[pd.DataFrame, np.array, float]:
     c = int((n - 2 * (r - 1)) / (3 * (r - 1)))
     print(f"c = {c}")
     seed=42
-    rng = np.random.default_rng(seed)
+    rng = np.random.default_rng(43)
     points, graph = random_points(n=n, seed=seed)
 
     # simulate tree
     p_rate = failing_rate_from_spanning_tree(points, p_mean=5e-4)
     
-    tree = nx.minimum_spanning_tree(graph, weight="weight")
-    subgraph, _ = IT.improve_tree(tree, R=r+1, root=0, weight_quantile=1)
-    
-    # Tag edges for plotting
-    for e in subgraph.edges:
-        subgraph.edges[e]["source"] = "tree" if e in tree.edges else "chord"
+    subgraph = TCL.add_edges_to_random_tree(graph, r=r, seed=seed, tree_factor=0.1)
         
     trees = [[subgraph, "trees", 0, get_saidi(subgraph, p_rate=p_rate, rng=rng)]]
     print("Simulate tree")
