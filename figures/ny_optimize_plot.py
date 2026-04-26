@@ -214,8 +214,7 @@ def simulate_ny_optimal_networks(
             print("=== simulate saidi ===")
             saidi_list = saidi_with_lengths(
                 graph,
-                sources=[next(iter(row.sources))]x``,
-                # sources=row.sources,
+                sources=list(row.sources),
                 p=p_list,
                 mode="mean",
                 T_days=365*5,
