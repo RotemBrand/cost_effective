@@ -110,7 +110,7 @@ def generate_data_MCMC(
     """    
     ny_data = rw.read_nxjson(manhattan_file_name)
     res_data = [] # r, p, t, saidi
-    rng = np.random.default_rng(13)
+    rng = np.random.default_rng(100)
     for r in [0, 1]:
         graph, sources = ny_data.query('r == @r').iloc[0][["graph", "sources"]].values
         for p_mean in [5e-4, 1e-3, 5e-3]:
