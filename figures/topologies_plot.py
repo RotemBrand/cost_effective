@@ -80,7 +80,7 @@ def nature_topologies_graph(
     # save
     if save:
         plt.savefig(
-            r'C:\Users\rotem\Desktop\מסמכים\תואר\תזה\write\baruch\topologies_plot\topologies_plot.svg',
+            r'outputs\topologies_plot\topologies_plot.svg',
             bbox_inches='tight',
             transparent=True,
             format='svg',
@@ -185,7 +185,7 @@ def save_selected_trees(trees: pd.DataFrame, plot_idx: list, save: bool = False)
             spine.set_joinstyle('round')
         if save:
             fig.savefig(
-                fr'C:\Users\rotem\Desktop\מסמכים\תואר\תזה\write\baruch\topologies_plot\tree_{i}.svg',
+                fr'outputs\topologies_plot\tree_{i}.svg',
                 bbox_inches='tight',
                 transparent=True,
                 format='svg',

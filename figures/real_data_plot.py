@@ -115,7 +115,7 @@ def real_data_plot(show_basemap: bool=True, show_text: bool=True,  save=False):
     # save
     if save:
         fig.savefig(
-            r'C:\Users\rotem\Desktop\מסמכים\תואר\תזה\write\baruch\real_data\real_data.svg',
+            r'outputs\real_data\real_data.svg',
             bbox_inches='tight',
             transparent=True,
             format='svg',

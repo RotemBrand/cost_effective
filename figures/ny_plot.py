@@ -116,7 +116,7 @@ def nature_ny_graph(
     # save
     if save:
         plt.savefig(
-            r'C:\Users\rotem\Desktop\מסמכים\תואר\תזה\write\baruch\ny_plot\ny_plot.svg',
+            r'outputs\ny_plot\ny_plot.svg',
             bbox_inches='tight',
             transparent=True,
         )
@@ -188,7 +188,7 @@ def ring_p_vs_f_zoom(
 
     if save:
         fig_zoom.savefig(
-            r'C:\Users\rotem\Desktop\מסמכים\תואר\תזה\write\baruch\ny_plot\ny_plot_ring_zoom.svg',
+            r'outputs\ny_plot\ny_plot_ring_zoom.svg',
             bbox_inches='tight',
             transparent=True,
         )

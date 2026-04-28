@@ -27,13 +27,13 @@ def example_draw(save: bool=False):
     # draw
     draw_network(graph, chain_size=0, strc_size=90, with_labels=False)
     if save:
-        file_name = r'C:\Users\rotem\Desktop\מסמכים\תואר\תזה\write\baruch\supp_graph_example.svg'
+        file_name = r'outputs\supp_graph_example.svg'
         plt.savefig(
             file_name,
             bbox_inches='tight',
             dpi=300
         )
-        print(f"graph saved to {r'C:\Users\rotem\Desktop\מסמכים\תואר\תזה\write\baruch\supp_graph_example.svg'}")
+        print(f"graph saved to {r'outputs\supp_graph_example.svg'}")
 
 
 def build_example_graph():
@@ -129,7 +129,7 @@ def supp_plot_spatial_network(save: bool=False):
     # save
     if save:
         fig.savefig(
-            r'C:\Users\rotem\Desktop\מסמכים\תואר\תזה\write\baruch\supp_spatial_network.svg',
+            r'outputs\supp_spatial_network.svg',
             bbox_inches='tight',
             dpi=300,
             transparent=True

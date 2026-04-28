@@ -104,13 +104,13 @@ def optimal_algorithm_plot(
     # save
     if save:
         fig.savefig(
-            r'C:\Users\rotem\Desktop\מסמכים\תואר\תזה\write\baruch\optimize_plot\optimize_plot.svg',
+            r'outputs\optimize_plot\optimize_plot.svg',
             bbox_inches='tight',
             dpi=300,
             transparent=True
         )
         axs_row = [ax for row in rows for ax in row]
-        save_axs_without_text(axs_row, r'C:\Users\rotem\Desktop\מסמכים\תואר\תזה\write\baruch\optimize_plot\optimize_plot\axes')
+        save_axs_without_text(axs_row, r'outputs\optimize_plot\optimize_plot\axes')
 
 # iluustrations
 def draw_illustration(ax: plt.Axes) -> tuple[tuple, tuple]:

@@ -54,7 +54,7 @@ def ny_optimize_plot(nyc_optimal_path: str = r"data/nyc_optimal.nxjson", save: b
 
     # Save logic
     if save:
-        base_save_dir = r'C:\Users\rotem\Desktop\מסמכים\תואר\תזה\write\baruch\ny_optimize_plot'
+        base_save_dir = r'outputs\ny_optimize_plot'
         os.makedirs(base_save_dir, exist_ok=True)
         plt.savefig(
             os.path.join(base_save_dir, 'ny_optimize_plot.svg'),
