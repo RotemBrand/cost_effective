@@ -106,6 +106,7 @@ def edge_probs_by_length(
     p: float,
     prob_attr: str | None = None,
     pos_attr: str = "pos",
+    length_attr: str | None = None,
     mode: Literal["rate", "mean"] = "rate",
     tol: float = 1e-5,
     max_iter: int = 100,
@@ -127,6 +128,9 @@ def edge_probs_by_length(
         If provided, also writes the computed probability to graph[u][v][prob_attr].
     pos_attr : str
         Node attribute containing position as (x, y).
+    length_attr : str | None
+        Edge attribute containing edge length. When supplied, this is used
+        instead of geometric endpoint distance.
     mode : {"rate", "mean"}
     tol, max_iter : solver settings for mode="mean"
 
@@ -140,19 +144,29 @@ def edge_probs_by_length(
     if graph.number_of_edges() == 0:
         return {}
 
-    pos = nx.get_node_attributes(graph, pos_attr)
-    if len(pos) != graph.number_of_nodes():
-        missing = [n for n in graph.nodes if n not in pos][:5]
-        raise KeyError(f"Missing '{pos_attr}' for some nodes, e.g. {missing}")
-
     # Stable edge list + keys
-    edges = list(graph.edges())
-    keys = [tuple(sorted((u, v))) for (u, v) in edges]  # assumes nodes are orderable
+    if isinstance(graph, nx.MultiGraph):
+        edges = list(graph.edges(keys=True))
+        keys = edges
+    else:
+        edges = list(graph.edges())
+        keys = [tuple(sorted((u, v))) for (u, v) in edges]  # assumes nodes are orderable
 
-    # Vectorized lengths
-    xy_u = np.array([pos[u] for (u, _) in edges], dtype=float)
-    xy_v = np.array([pos[v] for (_, v) in edges], dtype=float)
-    lengths = np.hypot(xy_v[:, 0] - xy_u[:, 0], xy_v[:, 1] - xy_u[:, 1])
+    if length_attr is not None:
+        missing = [e for e in edges if length_attr not in graph.edges[e]][:5]
+        if missing:
+            raise KeyError(f"Missing edge length attribute '{length_attr}', e.g. {missing}")
+        lengths = np.array([float(graph.edges[e][length_attr]) for e in edges], dtype=float)
+    else:
+        pos = nx.get_node_attributes(graph, pos_attr)
+        if len(pos) != graph.number_of_nodes():
+            missing = [n for n in graph.nodes if n not in pos][:5]
+            raise KeyError(f"Missing '{pos_attr}' for some nodes, e.g. {missing}")
+
+        # Vectorized lengths
+        xy_u = np.array([pos[e[0]] for e in edges], dtype=float)
+        xy_v = np.array([pos[e[1]] for e in edges], dtype=float)
+        lengths = np.hypot(xy_v[:, 0] - xy_u[:, 0], xy_v[:, 1] - xy_u[:, 1])
 
     if mode == "rate":
         rate = float(p)

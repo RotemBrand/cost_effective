@@ -96,6 +96,7 @@ class GraphRel:
         graph: nx.MultiGraph | nx.Graph,
         nodes_weight: Union[Dict, float] | None = None,
         edges_prob: Union[Dict, PROBS.Prob] | None = None,
+        edges_weight: Union[Dict, float] | None = None,
         max_fail: int| None = None,
         sources: ArrayLike = [0],
     ):
@@ -114,6 +115,8 @@ class GraphRel:
             edges_prob (Union[Dict, PROBS.Prob], optional): Edge failure probabilities 
                 as a dictionary or scalar. Defaults to None, which sets probabilities 
                 to default values.
+            edges_weight (Union[Dict, float], optional): Edge weights as a dictionary
+                or scalar. Defaults to None, which sets all edge weights to 0.
             max_fail (int, optional): Maximum number of failing edges allowed. Only 
                 applicable when the probability type supports it. Defaults to None.
             sources (ArrayLike, optional): List of source nodes for the graph. 
@@ -124,7 +127,7 @@ class GraphRel:
         self.original_graph = graph.copy()
         self.prob_class = None
         self.graph = self.init_graph_attributes(
-            copy(graph), copy(nodes_weight), copy(edges_prob)
+            copy(graph), copy(nodes_weight), copy(edges_weight), copy(edges_prob)
         )
         # set the source nodes
         for node in sources:
@@ -159,6 +162,7 @@ class GraphRel:
         self,
         graph: nx.MultiGraph,
         nodes_weight: Union[Dict, float],
+        edges_weight: Union[Dict, float],
         edges_prob: Union[Dict, PROBS.Prob],
     ) -> nx.MultiGraph:
         """
@@ -170,6 +174,7 @@ class GraphRel:
         Args:
             graph (nx.MultiGraph): The input graph to configure.
             nodes_weight (Union[Dict, float]): Node weights as a dictionary or scalar.
+            edges_weight (Union[Dict, float]): Edge weights as a dictionary or scalar.
             edges_prob (Union[Dict, PROBS.Prob]): Edge failure probabilities.
 
         Returns:
@@ -196,6 +201,21 @@ class GraphRel:
         for node, node_data in graph.nodes.items():
             if "weight" not in node_data:
                 raise ValueError(f"node {node} has no weight")
+        # set edge weights and tie metadata
+        edges_weight = self._init_edge_attr_from_input(
+            graph,
+            edges_weight,
+            attr="edge_weight",
+            default=0.0,
+        )
+        nx.set_edge_attributes(graph, edges_weight, "edge_weight")
+        is_tie = self._init_edge_attr_from_input(
+            graph,
+            None,
+            attr="is_tie",
+            default=False,
+        )
+        nx.set_edge_attributes(graph, is_tie, "is_tie")
         # set edges_prob
         if edges_prob is None:
             edges_prob = {edge: PROBS.Poly([0, 1]) for edge in graph.edges}
@@ -231,6 +251,33 @@ class GraphRel:
         self.nodes_to_int = nodes_to_int
         return graph
 
+    @staticmethod
+    def _init_edge_attr_from_input(
+        graph: nx.MultiGraph,
+        values: Union[Dict, float] | None,
+        attr: str,
+        default,
+    ) -> Dict[tuple, object]:
+        if values is None:
+            return {
+                edge: data.get(attr, default)
+                for edge, data in graph.edges.items()
+            }
+        if not isinstance(values, dict):
+            return {edge: values for edge in graph.edges}
+        if len(values) == 0:
+            return {edge: default for edge in graph.edges}
+        values_has_key_of_edge = len(next(iter(values.keys()))) == 3
+        if values_has_key_of_edge:
+            return {
+                edge: values.get(edge, graph.edges[edge].get(attr, default))
+                for edge in graph.edges
+            }
+        return {
+            edge: values.get(edge[:2], graph.edges[edge].get(attr, default))
+            for edge in graph.edges
+        }
+
     def calc_rel(self, rel_kinds: List[str] = None, method: Method="td") -> dict:
         """Calculate the graph reliabilities indexes according to rel_kinds_list
 
@@ -260,6 +307,7 @@ class GraphRel:
         ValueError
             if the method is not td or pivot
         """
+        self._raise_if_edge_weights_for_exact_methods()
         if method == "td":
             return self.culc_rel_td(rel_kinds=rel_kinds)
         if method == "pivot":
@@ -295,6 +343,7 @@ class GraphRel:
         Returns:
             dict: A dictionary with the SAIDI reliability index.
         """
+        self._raise_if_edge_weights_for_exact_methods()
         # create the skeleton
         gr_skeleton = utilities.create_gr_of_the_skeleton_graph(self)
         # calculate the reliability of the skeleton
@@ -358,6 +407,7 @@ class GraphRel:
         dict
             A dict where each key is a rel_kind and its results reliability
         """
+        self._raise_if_edge_weights_for_exact_methods()
         rel_kinds_ = [RelKind(rk) for rk in rel_kinds]
         # prepare the td for saidi computation
         if (
@@ -432,11 +482,12 @@ class GraphRel:
             graph_copy = self.graph.copy()
             nx.set_edge_attributes(graph_copy, current_edge_probs, "prob")
             saidi_res, components = simulate_rel(
-                nx.Graph(graph_copy),
+                nx.MultiGraph(graph_copy),
                 source=self.source,
                 rel_type=rel_type,
                 prob_attr="prob",
                 weight_attr="weight",
+                edge_weight_attr="edge_weight",
                 T_days=T_days,
                 mean_cycle_days=mean_cycle_days,
                 seed=seed,
@@ -457,6 +508,7 @@ class GraphRel:
         ### Returns:
             - `any`: The reliability of the graph
         """
+        self._raise_if_edge_weights_for_exact_methods()
         rel = self.culc_rel_recursive(self.graph.copy(), 0)
         rel = self.prob_class(rel, level=self.max_fail, reverse=True)
         if self.kind == RelKind.SAIDI:
@@ -652,6 +704,19 @@ class GraphRel:
         return np.sum(
             [self.graph.nodes[node]["weight"] for node in self.graph.nodes], axis=0
         )
+
+    def edge_total_weight(self):
+        """Return the total reliability weight stored on graph edges."""
+        return np.sum(
+            [data.get("edge_weight", 0.0) for _, _, data in self.graph.edges(data=True)],
+            axis=0,
+        )
+
+    def _raise_if_edge_weights_for_exact_methods(self):
+        if float(self.edge_total_weight()) != 0.0:
+            raise NotImplementedError(
+                "edge_weight is currently supported only by calc_rel_simulation()"
+            )
 
 
 def max_key(graph: nx.MultiGraph, u, v):

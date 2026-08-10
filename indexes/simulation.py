@@ -16,13 +16,62 @@ class RelSimulationResult(NamedTuple):
 
 
 def _key_edge(e: tuple) -> tuple:
-    return tuple(sorted(e))
+    edge = tuple(e)
+    pair = tuple(sorted(edge[:2]))
+    if len(edge) >= 3:
+        return pair + (edge[2],)
+    return pair
 
 def _key_edges(e_list: set[tuple]) -> tuple[tuple]:
-    return tuple(map(_key_edge, e_list))
+    return tuple(sorted((_key_edge(e) for e in e_list), key=repr))
+
+
+def _edge_data(graph: nx.Graph, e: tuple) -> dict:
+    if isinstance(graph, nx.MultiGraph):
+        return graph.edges[e]
+    return graph.edges[e[:2]]
+
+
+def _edge_exists(graph: nx.Graph, e: tuple) -> bool:
+    if isinstance(graph, nx.MultiGraph):
+        return graph.has_edge(e[0], e[1], e[2])
+    return graph.has_edge(*e[:2])
+
+
+def _add_edge_with_data(graph: nx.Graph, e: tuple, data: dict) -> None:
+    if isinstance(graph, nx.MultiGraph):
+        graph.add_edge(e[0], e[1], key=e[2], **data)
+    else:
+        graph.add_edge(*e[:2], **data)
+
+
+def _remove_edge(graph: nx.Graph, e: tuple) -> None:
+    if isinstance(graph, nx.MultiGraph):
+        graph.remove_edge(e[0], e[1], key=e[2])
+    else:
+        graph.remove_edge(*e[:2])
+
+
+def _edges(graph: nx.Graph) -> list[tuple]:
+    if isinstance(graph, nx.MultiGraph):
+        return list(graph.edges(keys=True))
+    return list(graph.edges())
+
+
+def _edges_data(graph: nx.Graph):
+    if isinstance(graph, nx.MultiGraph):
+        return graph.edges(keys=True, data=True)
+    return graph.edges(data=True)
 
 class ConnectedComponents:
-    def __init__(self, graph: nx.Graph, source: int | None, weight_attr: str, rel_type: RelType):
+    def __init__(
+        self,
+        graph: nx.Graph,
+        source: int | None,
+        weight_attr: str,
+        rel_type: RelType,
+        edge_weight_attr: str | None = None,
+    ):
         # validate
         if rel_type not in ["saidi", "pairwise"]:
             raise ValueError(f"rel_type should be saidi or pairwise not {rel_type}")
@@ -34,26 +83,43 @@ class ConnectedComponents:
             print(f"Warning! pairwise rel currently not support weighted nodes")
 
         # init                     
-        self.graph = nx.Graph(graph)
+        self.graph = graph.copy()
+        self._edge_data = {
+            _key_edge(tuple(edge)): data.copy()
+            for *edge, data in _edges_data(graph)
+        }
         self.source = source
         self.rel_type: RelType = rel_type
         self.down_edges = set()
         self.lru_cash = {}
         self.weight_attr = weight_attr
-        self.total_weight = sum(data[weight_attr] for _, data in graph.nodes.items())        
+        self.edge_weight_attr = edge_weight_attr
+        self.has_edge_weight = edge_weight_attr is not None and any(
+            float(data.get(edge_weight_attr, 0.0)) != 0.0
+            for *_, data in _edges_data(graph)
+        )
+        if self.has_edge_weight and rel_type != "saidi":
+            raise NotImplementedError("edge weights are currently supported only for rel_type='saidi'")
+        self.total_weight = sum(data[weight_attr] for _, data in graph.nodes.items())
+        if self.has_edge_weight:
+            self.total_weight += sum(
+                float(data.get(edge_weight_attr, 0.0))
+                for *_, data in _edges_data(graph)
+            )
 
     def add_edge(self, e: tuple):
-        if self.graph.has_edge(*e):
+        if _edge_exists(self.graph, e):
             raise ValueError("Try to add existing edge")
-        self.graph.add_edge(*e)
+        edge_data = self._edge_data.get(_key_edge(e), {})
+        _add_edge_with_data(self.graph, e, edge_data)
         if _key_edge(e) not in self.down_edges:
             raise ValueError("Try to remove non existing edge form self.down_edges")
         self.down_edges.remove(_key_edge(e))
     
     def remove_edge(self, e: tuple):
-        if not self.graph.has_edge(*e):
+        if not _edge_exists(self.graph, e):
             raise ValueError("Try to remove non-existing edge")
-        self.graph.remove_edge(*e)
+        _remove_edge(self.graph, e)
         if _key_edge(e) in self.down_edges:
             raise ValueError("Try to add existing edge form self.down_edges")
         self.down_edges.add(_key_edge(e))
@@ -68,6 +134,12 @@ class ConnectedComponents:
         if self.rel_type == "saidi":
             source_comp = nx.node_connected_component(self.graph, self.source)
             connected_weight = sum(self.graph.nodes[node][self.weight_attr] for node in source_comp)
+            if self.has_edge_weight:
+                connected_weight += sum(
+                    float(data.get(self.edge_weight_attr, 0.0))
+                    for u, v, *_, data in _edges_data(self.graph)
+                    if u in source_comp and v in source_comp
+                )
             disconnected_weight =  1 - connected_weight / self.total_weight
             if len(key_down_edges) <= 2:
                 self.lru_cash[key_down_edges] = disconnected_weight
@@ -103,13 +175,15 @@ def simulate_rel(
     T_days: float,
     mean_cycle_days: float,
     *,
+    edge_weight_attr: str | None = None,
     components: ConnectedComponents | None=None,
     seed: int | None = None,
     rng: np.random.Generator | None = None,
     show_progress: bool = True,
 ) -> tuple[RelSimulationResult, ConnectedComponents]:
     """
-    Event-driven reliability simulation (no dt), NetworkX version, with node weights.
+    Event-driven reliability simulation (no dt), NetworkX version, with node
+    weights and optional edge weights.
 
     Returns
     -------
@@ -135,18 +209,24 @@ def simulate_rel(
             raise KeyError(f"Missing node attribute '{weight_attr}' on node {v}")
         node_weight[v] = float(graph.nodes[v][weight_attr])
 
+    if edge_weight_attr is not None:
+        for *_, data in _edges_data(graph):
+            if edge_weight_attr not in data:
+                data[edge_weight_attr] = 0.0
+            data[edge_weight_attr] = float(data[edge_weight_attr])
 
-    edges = list(graph.edges())
+    edges = _edges(graph)
     m = len(edges)
 
     # ---- rates (per day) ----
     alpha = 1.0 / float(mean_cycle_days)
 
     p = np.empty(m, dtype=float)
-    for i, (u, v) in enumerate(edges):
-        if prob_attr not in graph[u][v]:
-            raise KeyError(f"Missing edge attribute '{prob_attr}' on edge {(u, v)}")
-        p_i = float(graph[u][v][prob_attr])
+    for i, edge in enumerate(edges):
+        data = _edge_data(graph, edge)
+        if prob_attr not in data:
+            raise KeyError(f"Missing edge attribute '{prob_attr}' on edge {edge}")
+        p_i = float(data[prob_attr])
         p[i] = float(np.clip(p_i, 1e-12, 1.0 - 1e-12))
 
     lam = alpha * p
@@ -154,12 +234,22 @@ def simulate_rel(
 
     # ---- live graph ----
     if components is None:
-        components = ConnectedComponents(graph, source=source, weight_attr=weight_attr, rel_type=rel_type)
+        components = ConnectedComponents(
+            graph,
+            source=source,
+            weight_attr=weight_attr,
+            rel_type=rel_type,
+            edge_weight_attr=edge_weight_attr,
+        )
     else:
         if components.source != source:
             raise ValueError(f"Passed components object with source {components.source}, which is different then {source}")
         if components.rel_type != rel_type:
             raise ValueError(f"Passed components object with rel_type {components.rel_type}, which is different then {rel_type}")
+        if components.edge_weight_attr != edge_weight_attr:
+            raise ValueError(
+                f"Passed components object with edge_weight_attr {components.edge_weight_attr}, which is different then {edge_weight_attr}"
+            )
         components.reset()
 
 

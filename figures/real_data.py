@@ -482,16 +482,29 @@ def get_sfo_networks(improve: bool=False) -> Dict[str, nx.Graph]:
         networks_dict['SFO Davidson'], _ = improve_tree(G, R=6, root=G.graph["sources"][0], weight_quantile=0.3, show_progress=True)
     return networks_dict
 
-def get_sfo_bounded_network(area: str="P2U", box: str="box") -> nx.Graph:
+def get_sfo_bounded_network(area: str="P2U", box: str="box", include_ties: bool=True) -> nx.Graph:
     dir = fr"data\power\better_grids\SFO\{area}"
     boundery = gpd.read_file(fr"{dir}\{box}.geojson").to_crs(3857)
     G = build_mv_network_from_boundery(dir, boundery.to_crs(32610), full_network=False)
-    G = nx.edge_subgraph(G, nx.minimum_spanning_tree(G).edges).copy()
+    G = _radial_graph_with_ties(G, include_ties=include_ties)
     _change_graph_crs(G, old_crs=32610, new_crs=3857)
     G = nx.relabel_nodes(G, dict(zip(G.nodes, range(len(G)))))
     G.graph["sources"] = [node for node, data in G.nodes.items() if data["is_source"]]
 
     return G
+
+
+def _radial_graph_with_ties(G: nx.Graph, include_ties: bool=True) -> nx.Graph:
+    normally_closed_edges = [
+        (u, v) for u, v, data in G.edges(data=True)
+        if not data.get("is_tie", False)
+    ]
+    closed_graph = nx.edge_subgraph(G, normally_closed_edges).copy()
+    radial_edges = list(nx.minimum_spanning_tree(closed_graph, weight="length_m").edges)
+    selected_edges = set(map(tuple, radial_edges))
+    if include_ties:
+        selected_edges.update((u, v) for u, v, data in G.edges(data=True) if data.get("is_tie", False))
+    return nx.edge_subgraph(G, selected_edges).copy()
 
 
 def _change_graph_crs(G: nx.Graph, old_crs: int, new_crs: int):
@@ -522,18 +535,23 @@ def build_network_from_gdfs(
             continue
         # Edge endpoints (as coordinates)
         start, end = geom.coords[0], geom.coords[-1]
-        nodeA, nodeB = row.NodeA, row.NodeB
+        nodeA, nodeB = _clean_node_id(row.NodeA), _clean_node_id(row.NodeB)
         length = geom.length  # Euclidean length in same units as CRS
-        G.add_edge(nodeA, nodeB, geometry=geom, length_m=length)
+        edge_attrs = _line_row_edge_attrs(row, length)
+        G.add_edge(nodeA, nodeB, geometry=geom, **edge_attrs)
         G.nodes[nodeA]["pos"] = np.array(list(start))
         G.nodes[nodeB]["pos"] = np.array(list(end))
-        G.nodes[nodeA]["middle_node"] = True
-        G.nodes[nodeB]["middle_node"] = True
+        is_switch_boundary = edge_attrs["is_switch"] or edge_attrs["is_tie"]
+        G.nodes[nodeA]["middle_node"] = G.nodes[nodeA].get("middle_node", True) and not is_switch_boundary
+        G.nodes[nodeB]["middle_node"] = G.nodes[nodeB].get("middle_node", True) and not is_switch_boundary
+        for node in (nodeA, nodeB):
+            G.nodes[node].setdefault("is_source", False)
+            G.nodes[node].setdefault("weight_kva", 0)
 
     # --- Add transformers as load nodes ---
     for _, row in transf.iterrows():
         pt = row.geometry
-        node = row.Node
+        node = _clean_node_id(row.Node)
         G.add_node(node)
         G.nodes[node]["weight_kva"] = row.get("Size_KVA", 0)
         G.nodes[node]["is_source"] = False
@@ -544,7 +562,7 @@ def build_network_from_gdfs(
     for _, row in subs.iterrows():
         pt = row.geometry
         pos = np.array([pt.x, pt.y])
-        node = row.Node
+        node = _clean_node_id(row.Node)
         if node not in G:
             G.add_node(node)
         G.nodes[node]["is_source"] = True
@@ -553,12 +571,77 @@ def build_network_from_gdfs(
         G.nodes[node]["middle_node"] = False
 
     # --- remove middle nodes ---
-    print(len(G))
     G = _remove_middle_nodes(G)
-    print(len(G))
     G = nx.subgraph(G, max(nx.connected_components(G), key=len))
     G.graph["sources"] = set([node for node, data in G.nodes.items() if data["is_source"]])
     return G
+
+
+def _clean_node_id(node) -> str:
+    return str(node).strip()
+
+
+def _edge_key_from_nodes(node_a, node_b) -> tuple[str, str]:
+    return tuple(sorted((_clean_node_id(node_a), _clean_node_id(node_b))))
+
+
+def _line_row_edge_attrs(row, length: float) -> dict:
+    is_tie = bool(getattr(row, "is_tie", False))
+    is_switch = bool(getattr(row, "is_switch", False)) or is_tie
+    status = getattr(row, "Status", None)
+    normally_closed = bool(getattr(row, "normally_closed", not is_tie))
+    return {
+        "length_m": float(length),
+        "length": float(length),
+        "is_switch": is_switch,
+        "is_tie": is_tie,
+        "normally_closed": normally_closed,
+        "status": status,
+        "code": getattr(row, "Code", None),
+        "switch_kind": getattr(row, "switch_kind", None),
+        "switch_codes": getattr(row, "switch_codes", None),
+    }
+
+
+def _add_switch_metadata_to_lines(
+    lines: gpd.GeoDataFrame,
+    switches: gpd.GeoDataFrame | None = None,
+) -> gpd.GeoDataFrame:
+    """Annotate SMART-DS lines with switch and normally-open tie metadata."""
+    lines = lines.copy()
+    lines["NodeA"] = lines["NodeA"].map(_clean_node_id)
+    lines["NodeB"] = lines["NodeB"].map(_clean_node_id)
+    lines["_edge_key"] = lines.apply(lambda row: _edge_key_from_nodes(row.NodeA, row.NodeB), axis=1)
+
+    if "Status" in lines:
+        status = lines["Status"].astype(str).str.strip()
+        open_edges = set(lines.loc[status == "0", "_edge_key"])
+    else:
+        open_edges = set()
+
+    switch_edges = set()
+    switch_kind_by_edge = {}
+    switch_codes_by_edge = {}
+    if switches is not None and len(switches) > 0:
+        switches = switches.copy()
+        switches["NodeA"] = switches["NodeA"].map(_clean_node_id)
+        switches["NodeB"] = switches["NodeB"].map(_clean_node_id)
+        switches["_edge_key"] = switches.apply(lambda row: _edge_key_from_nodes(row.NodeA, row.NodeB), axis=1)
+        switches["switch_kind"] = switches["Code"].astype(str).str.extract(r"^([^\(]+)")[0].str.strip()
+        switch_edges = set(switches["_edge_key"])
+        switch_kind_by_edge = switches.groupby("_edge_key")["switch_kind"].apply(
+            lambda values: "|".join(sorted(set(map(str, values))))
+        ).to_dict()
+        switch_codes_by_edge = switches.groupby("_edge_key")["Code"].apply(
+            lambda values: "|".join(sorted(set(map(str, values))))
+        ).to_dict()
+
+    lines["is_switch"] = lines["_edge_key"].isin(switch_edges | open_edges)
+    lines["is_tie"] = lines["_edge_key"].isin(open_edges)
+    lines["normally_closed"] = ~lines["is_tie"]
+    lines["switch_kind"] = lines["_edge_key"].map(switch_kind_by_edge)
+    lines["switch_codes"] = lines["_edge_key"].map(switch_codes_by_edge)
+    return lines.drop(columns=["_edge_key"])
 
 
 def build_mv_network(data_dir, voltage=12.47):
@@ -584,10 +667,14 @@ def build_mv_network(data_dir, voltage=12.47):
     lines = gpd.read_file(f"{data_dir}/Line_N.shp")
     transf = gpd.read_file(f"{data_dir}/DistribTransf_N.shp")
     subs = gpd.read_file(f"{data_dir}/HVMVSubstation_N.shp")
+    switches = _read_switching_devices(data_dir)
 
     # --- Filter lines by voltage ---
     vcol = [c for c in lines.columns if "NomV" in c or "voltage" in c][0]
     lines = lines[np.isclose(lines[vcol].astype(float), voltage, atol=0.1)]
+    if switches is not None and "NomV_kV" in switches:
+        switches = switches[np.isclose(switches["NomV_kV"].astype(float), voltage, atol=0.1)]
+    lines = _add_switch_metadata_to_lines(lines, switches)
 
     return build_network_from_gdfs(
         lines, transf, subs
@@ -611,14 +698,20 @@ def build_mv_network_from_boundery(data_dir, boundery, full_network: bool=True):
     else:
         lines = gpd.read_file(f"{data_dir}/Line_N.shp").set_crs(32610)
         nodes = gpd.read_file(f"{data_dir}/DistribTransf_N.shp").set_crs(32610)
+    switches = _read_switching_devices(data_dir)
+    if switches is not None:
+        switches = switches.set_crs(32610)
     transf = gpd.read_file(f"{data_dir}/DistribTransf_N.shp").set_crs(32610)
     subs = gpd.read_file(f"{data_dir}/HVMVSubstation_N.shp").set_crs(32610)
     
     # filter by polygon
     lines = lines.sjoin(boundery, how='inner')
+    if switches is not None:
+        switches = switches.sjoin(boundery, how='inner')
     transf = transf.sjoin(boundery, how='inner')
     subs = subs.sjoin(boundery, how='inner')
     nodes = nodes.sjoin(boundery, how='inner')
+    lines = _add_switch_metadata_to_lines(lines, switches)
     
     # get closest transf_for_each_node
     # ensure consistent integer index positions
@@ -628,6 +721,13 @@ def build_mv_network_from_boundery(data_dir, boundery, full_network: bool=True):
     return build_network_from_gdfs(
         lines, transf, subs
     )
+
+
+def _read_switching_devices(data_dir: str) -> gpd.GeoDataFrame | None:
+    switch_path = os.path.join(data_dir, "SwitchingDevices_N.shp")
+    if not os.path.exists(switch_path):
+        return None
+    return gpd.read_file(switch_path)
 
 def _find_closest_node2_to_node1(nodes1: gpd.GeoDataFrame, nodes2: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
     """Map each row in nodes1 to the closest row in nodes2 by geometry.
@@ -680,28 +780,60 @@ def _remove_middle_nodes(G: nx.Graph) -> nx.Graph:
 
     # Build subgraph of middle nodes
     G_middle = G.subgraph(middle_nodes)
-    node_to_boundary = {}
-
-    # For each connected component of middle nodes, find its boundary
-    for comp in nx.connected_components(G_middle):
-        boundary = _get_boundary_nodes(G, comp)
-        for n in comp:
-            node_to_boundary[n] = boundary
 
     # Start with subgraph of non-middle nodes
     G_clean = G.subgraph(set(G.nodes) - middle_nodes).copy()
 
     # Reconnect boundaries across removed middle nodes
-    for node, data in G.nodes(data=True):
-        if data.get("middle_node", False):
+    for comp in nx.connected_components(G_middle):
+        boundary = list(_get_boundary_nodes(G, comp))
+        if len(boundary) < 2:
             continue
-        for neighbor in G.neighbors(node):
-            if neighbor in node_to_boundary:
-                for b in node_to_boundary[neighbor]:
-                    if node != b:
-                        G_clean.add_edge(node, b)
+        comp_with_boundary = set(comp) | set(boundary)
+        local_graph = G.subgraph(comp_with_boundary)
+        for i, node in enumerate(boundary):
+            for b in boundary[i + 1:]:
+                if node == b:
+                    continue
+                try:
+                    path = nx.shortest_path(local_graph, node, b, weight="length_m")
+                except nx.NetworkXNoPath:
+                    continue
+                G_clean.add_edge(node, b, **_aggregate_path_attrs(G, path))
 
     return G_clean
+
+
+def _aggregate_path_attrs(G: nx.Graph, path: list) -> dict:
+    edges = list(zip(path[:-1], path[1:]))
+    attrs = [G.edges[e] for e in edges]
+    is_tie = any(bool(data.get("is_tie", False)) for data in attrs)
+    is_switch = any(bool(data.get("is_switch", False)) for data in attrs)
+    length_m = sum(float(data.get("length_m", data.get("length", 0.0))) for data in attrs)
+    switch_kind = sorted({
+        kind
+        for data in attrs
+        for kind in str(data.get("switch_kind", "")).split("|")
+        if kind and kind != "nan" and kind != "None"
+    })
+    switch_codes = sorted({
+        code
+        for data in attrs
+        for code in str(data.get("switch_codes", "")).split("|")
+        if code and code != "nan" and code != "None"
+    })
+    return {
+        "length_m": length_m,
+        "length": length_m,
+        "is_switch": is_switch,
+        "is_tie": is_tie,
+        "normally_closed": not is_tie,
+        "status": 0 if is_tie else 1,
+        "switch_kind": "|".join(switch_kind) if switch_kind else None,
+        "switch_codes": "|".join(switch_codes) if switch_codes else None,
+        "original_edges": [tuple(edge) for edge in edges],
+        "original_nodes": list(path),
+    }
 
 
 
@@ -857,4 +989,3 @@ def download_sfo_data(area: str):
             s3.download_file(bucket, key, local_path)
 
     print("\n✅ Done! All files saved in:", local_dir)
-
