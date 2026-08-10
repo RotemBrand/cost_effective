@@ -79,6 +79,15 @@ def _three_blob_cycle_graph() -> nx.Graph:
     return graph
 
 
+def _two_blobs_with_two_macro_links() -> nx.Graph:
+    graph = nx.Graph()
+    graph.add_edges_from(nx.complete_graph([0, 1, 2, 3]).edges())
+    graph.add_edges_from(nx.complete_graph([4, 5, 6, 7]).edges())
+    graph.add_edges_from([(2, 4), (3, 5)])
+    _set_weights(graph, {0: 0})
+    return graph
+
+
 def test_generalized_chains_contract_three_edge_components():
     decomposition = _graph_rel(_three_blob_cycle_graph(), sources=[0]).decompose()
 
@@ -89,6 +98,35 @@ def test_generalized_chains_contract_three_edge_components():
     assert generalized.endpoints == (0, 0)
     assert len(generalized.internal_nodes) == 2
     assert generalized.weight == pytest.approx(8.0)
+
+
+def test_generalized_macro_aggregates_parallel_links_in_simple_graph():
+    decomposition = _graph_rel(_two_blobs_with_two_macro_links(), sources=[0]).decompose()
+    parallel_counts = [
+        int(data.get("parallel_macro_edge_count", 1))
+        for _, _, data in decomposition.three_edge_macro_graph.edges(data=True)
+    ]
+
+    assert decomposition.three_edge_macro_graph.number_of_edges() == 1
+    assert parallel_counts == [2]
+
+
+def test_projection_generalized_components_match_networkx():
+    graph = _three_blob_cycle_graph()
+    networkx_decomp = _graph_rel(graph, sources=[0]).decompose(generalized_component_method="networkx")
+    projection_decomp = _graph_rel(graph, sources=[0]).decompose(generalized_component_method="projection")
+
+    networkx_members = {
+        frozenset(data["members"])
+        for _, data in networkx_decomp.three_edge_macro_graph.nodes(data=True)
+    }
+    projection_members = {
+        frozenset(data["members"])
+        for _, data in projection_decomp.three_edge_macro_graph.nodes(data=True)
+    }
+
+    assert projection_members == networkx_members
+    assert len(projection_decomp.generalized_chains) == len(networkx_decomp.generalized_chains)
 
 
 def test_tree_td_matches_full_td_on_pure_tree():

@@ -712,7 +712,12 @@ class GraphRel:
             axis=0,
         )
 
-    def decompose(self, *, include_generalized_chains: bool = True):
+    def decompose(
+        self,
+        *,
+        include_generalized_chains: bool = True,
+        generalized_component_method: Literal["networkx", "projection"] = "networkx",
+    ):
         """Return an edge-connectivity decomposition of this reliability graph.
 
         The decomposition is intentionally limited to simple input graphs. It
@@ -724,6 +729,7 @@ class GraphRel:
         return decompose_graph_rel(
             self,
             include_generalized_chains=include_generalized_chains,
+            generalized_component_method=generalized_component_method,
         )
 
     def _raise_if_edge_weights_for_exact_methods(self):

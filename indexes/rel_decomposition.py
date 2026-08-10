@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Iterable
+from pathlib import Path
+import sys
+from typing import Any, Iterable, Literal
 
 import networkx as nx
 
@@ -9,6 +11,7 @@ from . import probs as PROBS
 
 
 SOURCE_NODE = "__SOURCE__"
+ThreeEdgeComponentMethod = Literal["networkx", "projection"]
 
 
 def edge_key(u: Any, v: Any) -> tuple:
@@ -44,6 +47,7 @@ class EdgeReliabilityDecomposition:
     regular_chains: tuple[ChainSummary, ...]
     generalized_chains: tuple[ChainSummary, ...]
     component_sources: dict[int, tuple[Any, ...]]
+    generalized_component_method: str = "networkx"
 
     def td_saidi(self, *, graph: nx.Graph | None = None, source: Any | None = None, max_fail: int = 2):
         """Compute a truncated TD SAIDI polynomial on one decomposition graph.
@@ -80,6 +84,7 @@ def decompose_graph_rel(
     graph_rel,
     *,
     include_generalized_chains: bool = True,
+    generalized_component_method: ThreeEdgeComponentMethod = "networkx",
 ) -> EdgeReliabilityDecomposition:
     if isinstance(graph_rel.original_graph, nx.MultiGraph):
         raise TypeError("GraphRel decomposition currently supports nx.Graph input only, not MultiGraph")
@@ -98,7 +103,12 @@ def decompose_graph_rel(
         component_sources,
     )
     if include_generalized_chains:
-        three_edge_macro_graph = _contract_three_edge_components(structure_graph, sources=[source])
+        three_edge_macro_graph = _contract_three_edge_components(
+            structure_graph,
+            sources=[source],
+            chains=regular_chains,
+            component_method=generalized_component_method,
+        )
         generalized_chains = extract_chains(three_edge_macro_graph, sources=[source])
     else:
         three_edge_macro_graph = nx.Graph()
@@ -115,6 +125,7 @@ def decompose_graph_rel(
         regular_chains=tuple(regular_chains),
         generalized_chains=tuple(generalized_chains),
         component_sources=component_sources,
+        generalized_component_method=generalized_component_method,
     )
 
 
@@ -272,26 +283,46 @@ def _build_structure_graph(
     return structure, tuple(all_chains)
 
 
-def _contract_three_edge_components(graph: nx.Graph, sources: Iterable[Any]) -> nx.Graph:
+def _contract_three_edge_components(
+    graph: nx.Graph,
+    sources: Iterable[Any],
+    *,
+    chains: Iterable[ChainSummary] | None = None,
+    component_method: ThreeEdgeComponentMethod = "networkx",
+) -> nx.Graph:
     if graph.number_of_nodes() == 0:
         return nx.Graph()
 
     source_set = set(sources)
-    components = [set(comp) for comp in nx.k_edge_components(graph, k=3)]
-    node_to_component = {}
+    components = _three_edge_components_from_chains(
+        graph,
+        chains=chains,
+        component_method=component_method,
+    )
+    node_to_component: dict[Any, Any] = {}
+    component_nodes: list[tuple[Any, set[Any]]] = []
     for idx, comp in enumerate(components):
+        if len(comp) < 2:
+            continue
+        overlap = comp & set(node_to_component)
+        if overlap:
+            raise ValueError(
+                "3-edge component detection returned overlapping components; "
+                f"examples: {sorted(overlap, key=repr)[:5]}"
+            )
+        macro_node = _component_node_name("C3", idx, comp, source_set)
+        component_nodes.append((macro_node, comp))
         for node in comp:
-            node_to_component[node] = idx
+            node_to_component[node] = macro_node
 
     macro = nx.Graph()
-    for idx, comp in enumerate(components):
+    for macro_node, comp in component_nodes:
         original_nodes = _collect_original_nodes(graph, comp)
         internal_edge_weight = sum(
             float(data.get("edge_weight", 0.0))
             for u, v, data in graph.edges(comp, data=True)
             if u in comp and v in comp
         )
-        macro_node = _component_node_name("C3", idx, comp, source_set)
         macro.add_node(
             macro_node,
             weight=sum(float(graph.nodes[node].get("weight", 0.0)) for node in comp) + internal_edge_weight,
@@ -299,8 +330,15 @@ def _contract_three_edge_components(graph: nx.Graph, sources: Iterable[Any]) -> 
             members=frozenset(comp),
             contains_source=bool(comp & source_set),
         )
-        for node in comp:
-            node_to_component[node] = macro_node
+    for node, data in graph.nodes(data=True):
+        if node in node_to_component:
+            continue
+        node_data = data.copy()
+        node_data.setdefault("original_nodes", frozenset({node}))
+        node_data.setdefault("members", frozenset({node}))
+        node_data["contains_source"] = node in source_set
+        macro.add_node(node, **node_data)
+        node_to_component[node] = node
 
     for u, v, data in graph.edges(data=True):
         cu = node_to_component[u]
@@ -308,15 +346,124 @@ def _contract_three_edge_components(graph: nx.Graph, sources: Iterable[Any]) -> 
         if cu == cv:
             continue
         if macro.has_edge(cu, cv):
-            raise TypeError(
-                "3-edge macro graph would contain parallel edges; "
-                "MultiGraph decomposition is intentionally unsupported"
-            )
-        edge_data = data.copy()
-        edge_data.setdefault("edge_weight", 0.0)
-        edge_data.setdefault("length", data.get("length_m", 1.0))
+            _merge_macro_edge_data(macro.edges[cu, cv], data)
+            continue
+        edge_data = _initial_macro_edge_data(data)
         macro.add_edge(cu, cv, **edge_data)
     return macro
+
+
+def _initial_macro_edge_data(data: dict) -> dict:
+    edge_data = data.copy()
+    edge_data.setdefault("edge_weight", 0.0)
+    edge_data.setdefault("length", data.get("length_m", 1.0))
+    edge_data.setdefault("parallel_macro_edge_count", 1)
+    edge_data.setdefault("parallel_macro_edges", (tuple(edge_data.get("original_edges", ())),))
+    return edge_data
+
+
+def _merge_macro_edge_data(existing: dict, new_data: dict) -> None:
+    existing["parallel_macro_edge_count"] = int(existing.get("parallel_macro_edge_count", 1)) + 1
+    existing["length"] = float(existing.get("length", 0.0)) + float(new_data.get("length", new_data.get("length_m", 1.0)))
+    existing["edge_weight"] = float(existing.get("edge_weight", 0.0)) + float(new_data.get("edge_weight", 0.0))
+    existing["original_nodes"] = frozenset(
+        set(existing.get("original_nodes", set())) | set(new_data.get("original_nodes", set()))
+    )
+    existing["original_edges"] = frozenset(
+        set(existing.get("original_edges", set())) | set(new_data.get("original_edges", set()))
+    )
+    existing["parallel_macro_edges"] = tuple(existing.get("parallel_macro_edges", ())) + (
+        tuple(new_data.get("original_edges", ())),
+    )
+
+
+def _three_edge_components_from_chains(
+    graph: nx.Graph,
+    *,
+    chains: Iterable[ChainSummary] | None,
+    component_method: ThreeEdgeComponentMethod,
+) -> list[set[Any]]:
+    if component_method not in ("networkx", "projection"):
+        raise ValueError("component_method must be 'networkx' or 'projection'")
+
+    analysis_graph = _analysis_graph_from_chains(graph, chains)
+    if component_method == "networkx":
+        return _raw_three_edge_components_networkx(analysis_graph)
+    return _raw_three_edge_components_projection(analysis_graph)
+
+
+def _analysis_graph_from_chains(
+    graph: nx.Graph,
+    chains: Iterable[ChainSummary] | None,
+) -> nx.Graph:
+    analysis = nx.Graph()
+    analysis.add_nodes_from(graph.nodes)
+
+    if chains is None:
+        chain_iter = (
+            ChainSummary(
+                endpoints=(u, v),
+                nodes=(u, v),
+                edges=(edge_key(u, v),),
+                internal_nodes=(),
+                length=float(data.get("length", data.get("length_m", 1.0))),
+                weight=0.0,
+                edge_weight=float(data.get("edge_weight", 0.0)),
+            )
+            for u, v, data in graph.edges(data=True)
+        )
+    else:
+        chain_iter = iter(chains)
+
+    for chain_id, chain in enumerate(chain_iter):
+        u, v = chain.endpoints
+        analysis.add_node(u)
+        analysis.add_node(v)
+        if u == v:
+            continue
+        aux = ("reduced_edge", chain_id)
+        analysis.add_edge(u, aux)
+        analysis.add_edge(aux, v)
+    return analysis
+
+
+def _raw_three_edge_components_networkx(analysis_graph: nx.Graph) -> list[set[Any]]:
+    raw_components: list[set[Any]] = []
+    for component in nx.k_edge_components(analysis_graph, k=3):
+        skeleton_nodes = {node for node in component if not isinstance(node, tuple)}
+        if len(skeleton_nodes) >= 2:
+            raw_components.append(set(skeleton_nodes))
+    return raw_components
+
+
+def _raw_three_edge_components_projection(analysis_graph: nx.Graph) -> list[set[Any]]:
+    projection = _load_cascading_projection_detector()
+    return [
+        set(component)
+        for component in projection(
+            analysis_graph,
+            k=3,
+            min_skeleton_nodes=2,
+        )
+    ]
+
+
+def _load_cascading_projection_detector():
+    try:
+        from dc_graph.structure import _raw_components_projection
+
+        return _raw_components_projection
+    except ModuleNotFoundError:
+        sibling = Path(__file__).resolve().parents[2] / "cascading"
+        if sibling.exists():
+            sys.path.insert(0, str(sibling))
+            from dc_graph.structure import _raw_components_projection
+
+            return _raw_components_projection
+        raise ModuleNotFoundError(
+            "Projection-based 3-edge decomposition requires the sibling "
+            f"cascading project at {sibling}"
+        )
 
 
 def _component_node_name(prefix: str, idx: int, comp: set[Any], sources: set[Any]) -> Any:
