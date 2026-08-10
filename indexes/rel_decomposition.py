@@ -49,6 +49,10 @@ class EdgeReliabilityDecomposition:
     component_sources: dict[int, tuple[Any, ...]]
     generalized_component_method: str = "networkx"
 
+    @property
+    def total_weight(self) -> float:
+        return _total_graph_weight(self.source_graph)
+
     def td_saidi(self, *, graph: nx.Graph | None = None, source: Any | None = None, max_fail: int = 2):
         """Compute a truncated TD SAIDI polynomial on one decomposition graph.
 
@@ -78,6 +82,94 @@ class EdgeReliabilityDecomposition:
     def tree_td_saidi(self, *, max_fail: int = 2):
         source_component = self.source_graph.nodes[self.source]["component_id"]
         return self.td_saidi(graph=self.bridge_tree, source=source_component, max_fail=max_fail)
+
+    def switch_risk_terms(
+        self,
+        *,
+        edge_probs: dict | None = None,
+        mean_edge_failure_prob: float | None = None,
+        length_attr: str = "length",
+        output: Literal["float", "poly"] = "float",
+    ) -> "SwitchRiskTerms":
+        """Return tree and chain leading risk terms for a switch-section graph.
+
+        `output="float"` evaluates the terms using finite edge probabilities.
+        `output="poly"` returns leading polynomials in a mean-probability
+        parameter, with coefficients through p^2.
+        """
+        if output not in ("float", "poly"):
+            raise ValueError("output must be 'float' or 'poly'")
+        prepared = _prepare_edge_probabilities(
+            self.source_graph,
+            edge_probs=edge_probs,
+            mean_edge_failure_prob=mean_edge_failure_prob,
+            length_attr=length_attr,
+            output=output,
+        )
+        tree = _tree_risk(
+            self.bridge_tree,
+            self.source_graph.nodes[self.source]["component_id"],
+            prepared,
+            total_weight=self.total_weight,
+            output=output,
+        )
+        section = _nonbridge_section_edge_weight_risk(
+            self.source_graph,
+            self.bridges,
+            prepared,
+            total_weight=self.total_weight,
+            output=output,
+        )
+        internal = _chain_two_cut_risk(
+            self.regular_chains,
+            self.source_graph,
+            prepared,
+            total_weight=self.total_weight,
+            output=output,
+        )
+        structural = _chain_two_cut_risk(
+            self.generalized_chains,
+            self.three_edge_macro_graph,
+            prepared,
+            total_weight=self.total_weight,
+            output=output,
+        )
+        return SwitchRiskTerms(
+            total_weight=self.total_weight,
+            tree=tree,
+            nonbridge_section=section,
+            internal=internal,
+            structural=structural,
+            output=output,
+            mean_edge_failure_prob=mean_edge_failure_prob,
+            edge_failure_rate=prepared.edge_failure_rate,
+            mean_actual_edge_probability=prepared.mean_actual_edge_probability,
+        )
+
+
+@dataclass(frozen=True)
+class SwitchRiskTerms:
+    total_weight: float
+    tree: Any
+    nonbridge_section: Any
+    internal: Any
+    structural: Any
+    output: str
+    mean_edge_failure_prob: float | None = None
+    edge_failure_rate: float | None = None
+    mean_actual_edge_probability: float | None = None
+
+    @property
+    def total(self):
+        return self.tree + self.nonbridge_section + self.internal + self.structural
+
+
+@dataclass(frozen=True)
+class _PreparedEdgeProbabilities:
+    q: dict[tuple[Any, Any], float]
+    alpha: dict[tuple[Any, Any], float]
+    edge_failure_rate: float | None
+    mean_actual_edge_probability: float | None
 
 
 def decompose_graph_rel(
@@ -195,9 +287,16 @@ def _build_bridge_tree(
     bridge_tree = nx.Graph()
     for idx, comp in enumerate(components):
         original_nodes = _collect_original_nodes(graph, comp)
+        internal_edge_weight = sum(
+            float(data.get("edge_weight", 0.0))
+            for u, v, data in graph.edges(comp, data=True)
+            if u in comp and v in comp
+        )
         bridge_tree.add_node(
             idx,
-            weight=sum(float(graph.nodes[node].get("weight", 0.0)) for node in comp),
+            weight=sum(float(graph.nodes[node].get("weight", 0.0)) for node in comp) + internal_edge_weight,
+            node_weight=sum(float(graph.nodes[node].get("weight", 0.0)) for node in comp),
+            internal_edge_weight=internal_edge_weight,
             original_nodes=frozenset(original_nodes),
             members=frozenset(comp),
         )
@@ -211,6 +310,270 @@ def _build_bridge_tree(
         data["original_edges"] = frozenset({edge_key(u, v)})
         bridge_tree.add_edge(cu, cv, **data)
     return bridge_tree
+
+
+def _total_graph_weight(graph: nx.Graph) -> float:
+    return sum(float(data.get("weight", 0.0)) for _, data in graph.nodes(data=True)) + sum(
+        float(data.get("edge_weight", 0.0)) for _, _, data in graph.edges(data=True)
+    )
+
+
+def _prepare_edge_probabilities(
+    graph: nx.Graph,
+    *,
+    edge_probs: dict | None,
+    mean_edge_failure_prob: float | None,
+    length_attr: str,
+    output: Literal["float", "poly"],
+) -> _PreparedEdgeProbabilities:
+    if edge_probs is not None and mean_edge_failure_prob is not None:
+        raise ValueError("pass either edge_probs or mean_edge_failure_prob, not both")
+
+    edge_failure_rate = None
+    mean_actual = None
+    if mean_edge_failure_prob is not None:
+        from .utilities import edge_probs_by_length
+
+        q_raw, edge_failure_rate = edge_probs_by_length(
+            graph,
+            p=mean_edge_failure_prob,
+            mode="mean",
+            length_attr=length_attr,
+        )
+        q = {_canonical_edge_key(edge): float(prob) for edge, prob in q_raw.items()}
+        if mean_edge_failure_prob == 0:
+            alpha = {edge: 0.0 for edge in q}
+        else:
+            alpha = {edge: prob / float(mean_edge_failure_prob) for edge, prob in q.items()}
+        mean_actual = sum(q.values()) / len(q) if q else 0.0
+        return _PreparedEdgeProbabilities(
+            q=q,
+            alpha=alpha,
+            edge_failure_rate=edge_failure_rate,
+            mean_actual_edge_probability=mean_actual,
+        )
+
+    if edge_probs is None:
+        edge_probs = {
+            edge_key(u, v): data.get("prob", PROBS.Poly([0, 1]))
+            for u, v, data in graph.edges(data=True)
+        }
+
+    q: dict[tuple[Any, Any], float] = {}
+    alpha: dict[tuple[Any, Any], float] = {}
+    for edge, prob in edge_probs.items():
+        key = _canonical_edge_key(edge)
+        q[key] = _prob_float(prob) if output == "float" else 0.0
+        alpha[key] = _prob_first_order_coeff(prob)
+    mean_actual = sum(q.values()) / len(q) if q else 0.0
+    return _PreparedEdgeProbabilities(
+        q=q,
+        alpha=alpha,
+        edge_failure_rate=None,
+        mean_actual_edge_probability=mean_actual,
+    )
+
+
+def _tree_risk(
+    tree: nx.Graph,
+    root: Any,
+    prepared: _PreparedEdgeProbabilities,
+    *,
+    total_weight: float,
+    output: Literal["float", "poly"],
+):
+    if total_weight <= 0:
+        raise ValueError("total graph weight is zero")
+    if tree.number_of_nodes() == 0:
+        return _zero(output)
+
+    parent = {root: None}
+    parent_edge: dict[Any, tuple[Any, Any]] = {}
+    order = [root]
+    stack = [root]
+    while stack:
+        node = stack.pop()
+        for neighbor in tree.neighbors(node):
+            if neighbor == parent.get(node):
+                continue
+            parent[neighbor] = node
+            parent_edge[neighbor] = edge_key(node, neighbor)
+            stack.append(neighbor)
+            order.append(neighbor)
+
+    if output == "float":
+        live_prob = {root: 1.0}
+        connected_load = float(tree.nodes[root].get("weight", 0.0))
+        for node in order[1:]:
+            edge = parent_edge[node]
+            q_edge = _combined_failure_float(tree.edges[edge], prepared)
+            live_prob[node] = live_prob[parent[node]] * (1.0 - q_edge)
+            connected_load += float(tree.nodes[node].get("weight", 0.0)) * live_prob[node]
+            connected_load += float(tree.edges[edge].get("edge_weight", 0.0)) * live_prob[node]
+        return 1.0 - connected_load / total_weight
+
+    path_a1 = {root: 0.0}
+    path_a2 = {root: 0.0}
+    c1 = 0.0
+    c2 = 0.0
+    for node in order[1:]:
+        edge = parent_edge[node]
+        alpha = _combined_failure_alpha(tree.edges[edge], prepared)
+        prev = parent[node]
+        path_a2[node] = path_a2[prev] + path_a1[prev] * alpha
+        path_a1[node] = path_a1[prev] + alpha
+        load = float(tree.nodes[node].get("weight", 0.0)) + float(tree.edges[edge].get("edge_weight", 0.0))
+        c1 += load * path_a1[node]
+        c2 -= load * path_a2[node]
+    return PROBS.Poly([0.0, c1 / total_weight, c2 / total_weight])
+
+
+def _nonbridge_section_edge_weight_risk(
+    graph: nx.Graph,
+    bridges: Iterable[tuple[Any, Any]],
+    prepared: _PreparedEdgeProbabilities,
+    *,
+    total_weight: float,
+    output: Literal["float", "poly"],
+):
+    if total_weight <= 0:
+        raise ValueError("total graph weight is zero")
+    bridge_set = {edge_key(*edge) for edge in bridges}
+    c1 = 0.0
+    for u, v, data in graph.edges(data=True):
+        if edge_key(u, v) in bridge_set:
+            continue
+        edge_weight = float(data.get("edge_weight", 0.0))
+        if edge_weight == 0.0:
+            continue
+        if output == "float":
+            c1 += edge_weight * _combined_failure_float(data, prepared)
+        else:
+            c1 += edge_weight * _combined_failure_alpha(data, prepared)
+    if output == "float":
+        return c1 / total_weight
+    return PROBS.Poly([0.0, c1 / total_weight])
+
+
+def _chain_two_cut_risk(
+    chains: Iterable[ChainSummary],
+    graph: nx.Graph,
+    prepared: _PreparedEdgeProbabilities,
+    *,
+    total_weight: float,
+    output: Literal["float", "poly"],
+):
+    if total_weight <= 0:
+        raise ValueError("total graph weight is zero")
+    coefficient = 0.0
+    for chain in chains:
+        coefficient += _chain_two_cut_damage_sum(chain, graph, prepared, output=output)
+    if output == "float":
+        return coefficient / total_weight
+    return PROBS.Poly([0.0, 0.0, coefficient / total_weight])
+
+
+def _chain_two_cut_damage_sum(
+    chain: ChainSummary,
+    graph: nx.Graph,
+    prepared: _PreparedEdgeProbabilities,
+    *,
+    output: Literal["float", "poly"],
+) -> float:
+    if len(chain.edges) < 2:
+        return 0.0
+
+    probs = [
+        _combined_failure_float(graph.edges[edge], prepared)
+        if output == "float"
+        else _combined_failure_alpha(graph.edges[edge], prepared)
+        for edge in chain.edges
+    ]
+    prefix_load = _chain_prefix_loads(chain, graph)
+    left_prob_sum = 0.0
+    left_prob_prefix_sum = 0.0
+    damage = 0.0
+    for idx, prob in enumerate(probs):
+        damage += prob * (prefix_load[idx] * left_prob_sum - left_prob_prefix_sum)
+        left_prob_sum += prob
+        left_prob_prefix_sum += prob * prefix_load[idx]
+    return damage
+
+
+def _chain_prefix_loads(chain: ChainSummary, graph: nx.Graph) -> list[float]:
+    # prefix[t] is load between the chain start and node position t:
+    # nodes 1..t plus edge loads 1..t-1. Two failed edges i<j trap
+    # prefix[j] - prefix[i].
+    prefix = [0.0]
+    acc = 0.0
+    for pos in range(1, len(chain.nodes)):
+        node = chain.nodes[pos]
+        acc += float(graph.nodes[node].get("weight", 0.0))
+        if pos - 1 > 0:
+            acc += float(graph.edges[chain.edges[pos - 1]].get("edge_weight", 0.0))
+        prefix.append(acc)
+    return prefix
+
+
+def _combined_failure_float(edge_data: dict, prepared: _PreparedEdgeProbabilities) -> float:
+    probs = [_edge_q(edge, prepared) for edge in edge_data.get("original_edges", ())]
+    if not probs:
+        probs = [_edge_q(edge_data.get("original_edge"), prepared)] if edge_data.get("original_edge") is not None else []
+    if not probs:
+        return 0.0
+    live = 1.0
+    for prob in probs:
+        live *= 1.0 - prob
+    return 1.0 - live
+
+
+def _combined_failure_alpha(edge_data: dict, prepared: _PreparedEdgeProbabilities) -> float:
+    edges = edge_data.get("original_edges", ())
+    if not edges and edge_data.get("original_edge") is not None:
+        edges = (edge_data["original_edge"],)
+    return sum(_edge_alpha(edge, prepared) for edge in edges)
+
+
+def _edge_q(edge: Any, prepared: _PreparedEdgeProbabilities) -> float:
+    return prepared.q.get(_canonical_edge_key(edge), 0.0)
+
+
+def _edge_alpha(edge: Any, prepared: _PreparedEdgeProbabilities) -> float:
+    return prepared.alpha.get(_canonical_edge_key(edge), 0.0)
+
+
+def _canonical_edge_key(edge: Any) -> tuple[Any, Any]:
+    if edge is None:
+        return (None, None)
+    if len(edge) >= 2:
+        return edge_key(edge[0], edge[1])
+    raise ValueError(f"edge key must contain at least two endpoints, got {edge!r}")
+
+
+def _prob_float(prob: Any) -> float:
+    if isinstance(prob, PROBS.Float):
+        return float(prob)
+    if isinstance(prob, PROBS.Poly):
+        if prob.degree == 0:
+            return float(prob[0])
+        raise ValueError("cannot evaluate a non-constant Poly probability without an explicit p value")
+    if hasattr(prob, "prob"):
+        return float(prob.prob)
+    return float(prob)
+
+
+def _prob_first_order_coeff(prob: Any) -> float:
+    if isinstance(prob, PROBS.Poly):
+        return float(prob[1])
+    if isinstance(prob, PROBS.Float):
+        return float(prob)
+    if hasattr(prob, "prob"):
+        return float(prob.prob)
+    return float(prob)
+
+
+def _zero(output: Literal["float", "poly"]):
+    return 0.0 if output == "float" else PROBS.Poly([0.0])
 
 
 def _component_sources(
