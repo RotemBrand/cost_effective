@@ -712,6 +712,20 @@ class GraphRel:
             axis=0,
         )
 
+    def decompose(self, *, include_generalized_chains: bool = True):
+        """Return an edge-connectivity decomposition of this reliability graph.
+
+        The decomposition is intentionally limited to simple input graphs. It
+        rejects user-supplied MultiGraphs and also rejects cases where source
+        contraction creates parallel edges.
+        """
+        from .rel_decomposition import decompose_graph_rel
+
+        return decompose_graph_rel(
+            self,
+            include_generalized_chains=include_generalized_chains,
+        )
+
     def _raise_if_edge_weights_for_exact_methods(self):
         if float(self.edge_total_weight()) != 0.0:
             raise NotImplementedError(
