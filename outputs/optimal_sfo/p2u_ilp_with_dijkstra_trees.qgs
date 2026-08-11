@@ -1,0 +1,168 @@
+<!DOCTYPE qgis PUBLIC 'http://mrcc.com/qgis.dtd' 'SYSTEM'>
+<qgis version="3.34.0" projectname="P2U ILP backbone with Dijkstra trees">
+  <homePath path="."/>
+  <title>P2U ILP backbone with Dijkstra trees</title>
+  <layer-tree-group checked="Qt::Checked" expanded="1" name="">
+    <customproperties/>
+    <layer-tree-group checked="Qt::Checked" expanded="1" name="P2U optimized network">
+      <layer-tree-layer checked="1" id="backbone_edges_0de91cb1" name="ILP 2-edge backbone" source="./p2u_ilp_with_dijkstra_trees_3857.gpkg|layername=backbone_edges"/>
+      <layer-tree-layer checked="1" id="dijkstra_tree_edges_78fd5ba3" name="Dijkstra 1-comp trees" source="./p2u_ilp_with_dijkstra_trees_3857.gpkg|layername=dijkstra_tree_edges"/>
+      <layer-tree-layer checked="1" id="backbone_transformer_nodes_b6b97241" name="Backbone transformers" source="./p2u_ilp_with_dijkstra_trees_3857.gpkg|layername=backbone_transformer_nodes"/>
+      <layer-tree-layer checked="1" id="tree_transformers_feb29bc4" name="Tree transformers" source="./p2u_ilp_with_dijkstra_trees_3857.gpkg|layername=tree_transformers"/>
+      <layer-tree-layer checked="1" id="backbone_source_nodes_72d34642" name="Sources" source="./p2u_ilp_with_dijkstra_trees_3857.gpkg|layername=backbone_source_nodes"/>
+    </layer-tree-group>
+  </layer-tree-group>
+  <projectlayers>
+  <maplayer type="vector" geometry="Line">
+    <id>backbone_edges_0de91cb1</id>
+    <datasource>./p2u_ilp_with_dijkstra_trees_3857.gpkg|layername=backbone_edges</datasource>
+    <layername>ILP 2-edge backbone</layername>
+    <srs>
+      <spatialrefsys>
+        <authid>EPSG:3857</authid>
+        <description>WGS 84 / Pseudo-Mercator</description>
+        <projectionacronym>merc</projectionacronym>
+        <ellipsoidacronym>EPSG:7030</ellipsoidacronym>
+        <geographicflag>false</geographicflag>
+      </spatialrefsys>
+    </srs>
+    <provider encoding="UTF-8">ogr</provider>
+      <renderer-v2 type="singleSymbol">
+        <symbols>
+          <symbol alpha="1" type="line" name="0">
+            <layer enabled="1" class="SimpleLine">
+              <Option type="Map">
+                <Option name="line_color" type="QString" value="174,56,132,255"/>
+                <Option name="line_style" type="QString" value="solid"/>
+                <Option name="line_width" type="QString" value="0.65"/>
+                <Option name="line_width_unit" type="QString" value="MM"/>
+              </Option>
+            </layer>
+          </symbol>
+        </symbols>
+      </renderer-v2>
+  </maplayer>
+  <maplayer type="vector" geometry="Line">
+    <id>dijkstra_tree_edges_78fd5ba3</id>
+    <datasource>./p2u_ilp_with_dijkstra_trees_3857.gpkg|layername=dijkstra_tree_edges</datasource>
+    <layername>Dijkstra 1-comp trees</layername>
+    <srs>
+      <spatialrefsys>
+        <authid>EPSG:3857</authid>
+        <description>WGS 84 / Pseudo-Mercator</description>
+        <projectionacronym>merc</projectionacronym>
+        <ellipsoidacronym>EPSG:7030</ellipsoidacronym>
+        <geographicflag>false</geographicflag>
+      </spatialrefsys>
+    </srs>
+    <provider encoding="UTF-8">ogr</provider>
+      <renderer-v2 type="singleSymbol">
+        <symbols>
+          <symbol alpha="1" type="line" name="0">
+            <layer enabled="1" class="SimpleLine">
+              <Option type="Map">
+                <Option name="line_color" type="QString" value="64,118,184,210"/>
+                <Option name="line_style" type="QString" value="solid"/>
+                <Option name="line_width" type="QString" value="0.35"/>
+                <Option name="line_width_unit" type="QString" value="MM"/>
+              </Option>
+            </layer>
+          </symbol>
+        </symbols>
+      </renderer-v2>
+  </maplayer>
+  <maplayer type="vector" geometry="Point">
+    <id>backbone_transformer_nodes_b6b97241</id>
+    <datasource>./p2u_ilp_with_dijkstra_trees_3857.gpkg|layername=backbone_transformer_nodes</datasource>
+    <layername>Backbone transformers</layername>
+    <srs>
+      <spatialrefsys>
+        <authid>EPSG:3857</authid>
+        <description>WGS 84 / Pseudo-Mercator</description>
+        <projectionacronym>merc</projectionacronym>
+        <ellipsoidacronym>EPSG:7030</ellipsoidacronym>
+        <geographicflag>false</geographicflag>
+      </spatialrefsys>
+    </srs>
+    <provider encoding="UTF-8">ogr</provider>
+      <renderer-v2 type="singleSymbol">
+        <symbols>
+          <symbol alpha="1" type="marker" name="0">
+            <layer enabled="1" class="SimpleMarker">
+              <Option type="Map">
+                <Option name="color" type="QString" value="255,255,255,0"/>
+                <Option name="outline_color" type="QString" value="174,56,132,255"/>
+                <Option name="outline_width" type="QString" value="0.35"/>
+                <Option name="outline_width_unit" type="QString" value="MM"/>
+                <Option name="size" type="QString" value="1.2"/>
+                <Option name="size_unit" type="QString" value="MM"/>
+              </Option>
+            </layer>
+          </symbol>
+        </symbols>
+      </renderer-v2>
+  </maplayer>
+  <maplayer type="vector" geometry="Point">
+    <id>tree_transformers_feb29bc4</id>
+    <datasource>./p2u_ilp_with_dijkstra_trees_3857.gpkg|layername=tree_transformers</datasource>
+    <layername>Tree transformers</layername>
+    <srs>
+      <spatialrefsys>
+        <authid>EPSG:3857</authid>
+        <description>WGS 84 / Pseudo-Mercator</description>
+        <projectionacronym>merc</projectionacronym>
+        <ellipsoidacronym>EPSG:7030</ellipsoidacronym>
+        <geographicflag>false</geographicflag>
+      </spatialrefsys>
+    </srs>
+    <provider encoding="UTF-8">ogr</provider>
+      <renderer-v2 type="singleSymbol">
+        <symbols>
+          <symbol alpha="1" type="marker" name="0">
+            <layer enabled="1" class="SimpleMarker">
+              <Option type="Map">
+                <Option name="color" type="QString" value="255,255,255,0"/>
+                <Option name="outline_color" type="QString" value="64,118,184,255"/>
+                <Option name="outline_width" type="QString" value="0.35"/>
+                <Option name="outline_width_unit" type="QString" value="MM"/>
+                <Option name="size" type="QString" value="0.9"/>
+                <Option name="size_unit" type="QString" value="MM"/>
+              </Option>
+            </layer>
+          </symbol>
+        </symbols>
+      </renderer-v2>
+  </maplayer>
+  <maplayer type="vector" geometry="Point">
+    <id>backbone_source_nodes_72d34642</id>
+    <datasource>./p2u_ilp_with_dijkstra_trees_3857.gpkg|layername=backbone_source_nodes</datasource>
+    <layername>Sources</layername>
+    <srs>
+      <spatialrefsys>
+        <authid>EPSG:3857</authid>
+        <description>WGS 84 / Pseudo-Mercator</description>
+        <projectionacronym>merc</projectionacronym>
+        <ellipsoidacronym>EPSG:7030</ellipsoidacronym>
+        <geographicflag>false</geographicflag>
+      </spatialrefsys>
+    </srs>
+    <provider encoding="UTF-8">ogr</provider>
+      <renderer-v2 type="singleSymbol">
+        <symbols>
+          <symbol alpha="1" type="marker" name="0">
+            <layer enabled="1" class="SimpleMarker">
+              <Option type="Map">
+                <Option name="color" type="QString" value="18,18,18,255"/>
+                <Option name="outline_color" type="QString" value="255,255,255,255"/>
+                <Option name="outline_width" type="QString" value="0.35"/>
+                <Option name="outline_width_unit" type="QString" value="MM"/>
+                <Option name="size" type="QString" value="2.6"/>
+                <Option name="size_unit" type="QString" value="MM"/>
+              </Option>
+            </layer>
+          </symbol>
+        </symbols>
+      </renderer-v2>
+  </maplayer>
+  </projectlayers>
+</qgis>

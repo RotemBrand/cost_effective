@@ -1,0 +1,17 @@
+{
+  "backbone_solution_gpkg": "C:\\Users\\rotem\\Desktop\\\u05de\u05e1\u05de\u05db\u05d9\u05dd\\\u05ea\u05d5\u05d0\u05e8\\\u05ea\u05d6\u05d4\\\u05e1\u05d9\u05de\u05d5\u05dc\u05e6\u05d9\u05d5\u05ea\\cost_effective\\outputs\\optimal_sfo\\p2u_ilp_2edge_solution_3857_1786485809.gpkg",
+  "backbone_edges": 5514,
+  "backbone_transformer_nodes": 5295,
+  "source_nodes": 15,
+  "backbone_road_nodes": 5310,
+  "total_transformers": 12373,
+  "transformers_in_backbone_by_road_node": 5615,
+  "tree_transformers_attached": 6758,
+  "tree_transformers_unattached": 0,
+  "dijkstra_tree_edges": 19003,
+  "dijkstra_tree_length_m": 216849.20323873457,
+  "tree_transformer_capacity_kva": 554975.0,
+  "mean_distance_to_backbone_m": 82.63150959799336,
+  "max_distance_to_backbone_m": 1005.51685943366,
+  "output_gpkg": "C:\\Users\\rotem\\Desktop\\\u05de\u05e1\u05de\u05db\u05d9\u05dd\\\u05ea\u05d5\u05d0\u05e8\\\u05ea\u05d6\u05d4\\\u05e1\u05d9\u05de\u05d5\u05dc\u05e6\u05d9\u05d5\u05ea\\cost_effective\\outputs\\optimal_sfo\\p2u_ilp_with_dijkstra_trees_3857.gpkg"
+}
