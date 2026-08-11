@@ -1,0 +1,105 @@
+<!DOCTYPE qgis PUBLIC 'http://mrcc.com/qgis.dtd' 'SYSTEM'>
+<qgis version="3.34.0" projectname="P2U ILP 2-edge solution">
+  <homePath path="."/>
+  <title>P2U ILP 2-edge solution</title>
+  <layer-tree-group checked="Qt::Checked" expanded="1" name="">
+    <customproperties/>
+    <layer-tree-group checked="Qt::Checked" expanded="1" name="P2U ILP 2-edge solution">
+      <layer-tree-layer checked="1" id="solution_edges_eb3db9ef" name="ILP solution edges" source="./p2u_ilp_2edge_solution_3857_1786485809.gpkg|layername=solution_edges"/>
+      <layer-tree-layer checked="1" id="solution_transformer_nodes_8e663113" name="ILP transformer nodes" source="./p2u_ilp_2edge_solution_3857_1786485809.gpkg|layername=solution_transformer_nodes"/>
+      <layer-tree-layer checked="1" id="solution_source_nodes_1bd69f03" name="ILP source nodes" source="./p2u_ilp_2edge_solution_3857_1786485809.gpkg|layername=solution_source_nodes"/>
+    </layer-tree-group>
+  </layer-tree-group>
+  <projectlayers>
+  <maplayer type="vector" geometry="Line">
+    <id>solution_edges_eb3db9ef</id>
+    <datasource>./p2u_ilp_2edge_solution_3857_1786485809.gpkg|layername=solution_edges</datasource>
+    <layername>ILP solution edges</layername>
+    <srs>
+      <spatialrefsys>
+        <authid>EPSG:3857</authid>
+        <description>WGS 84 / Pseudo-Mercator</description>
+        <projectionacronym>merc</projectionacronym>
+        <ellipsoidacronym>EPSG:7030</ellipsoidacronym>
+        <geographicflag>false</geographicflag>
+      </spatialrefsys>
+    </srs>
+    <provider encoding="UTF-8">ogr</provider>
+      <renderer-v2 type="singleSymbol">
+        <symbols>
+          <symbol alpha="1" type="line" name="0">
+            <layer enabled="1" class="SimpleLine">
+              <Option type="Map">
+                <Option name="line_color" type="QString" value="174,56,132,255"/>
+                <Option name="line_width" type="QString" value="0.65"/>
+                <Option name="line_width_unit" type="QString" value="MM"/>
+              </Option>
+            </layer>
+          </symbol>
+        </symbols>
+      </renderer-v2>
+  </maplayer>
+  <maplayer type="vector" geometry="Point">
+    <id>solution_transformer_nodes_8e663113</id>
+    <datasource>./p2u_ilp_2edge_solution_3857_1786485809.gpkg|layername=solution_transformer_nodes</datasource>
+    <layername>ILP transformer nodes</layername>
+    <srs>
+      <spatialrefsys>
+        <authid>EPSG:3857</authid>
+        <description>WGS 84 / Pseudo-Mercator</description>
+        <projectionacronym>merc</projectionacronym>
+        <ellipsoidacronym>EPSG:7030</ellipsoidacronym>
+        <geographicflag>false</geographicflag>
+      </spatialrefsys>
+    </srs>
+    <provider encoding="UTF-8">ogr</provider>
+      <renderer-v2 type="singleSymbol">
+        <symbols>
+          <symbol alpha="1" type="marker" name="0">
+            <layer enabled="1" class="SimpleMarker">
+              <Option type="Map">
+                <Option name="color" type="QString" value="255,255,255,0"/>
+                <Option name="outline_color" type="QString" value="203,64,60,255"/>
+                <Option name="outline_width" type="QString" value="0.35"/>
+                <Option name="outline_width_unit" type="QString" value="MM"/>
+                <Option name="size" type="QString" value="1.2"/>
+                <Option name="size_unit" type="QString" value="MM"/>
+              </Option>
+            </layer>
+          </symbol>
+        </symbols>
+      </renderer-v2>
+  </maplayer>
+  <maplayer type="vector" geometry="Point">
+    <id>solution_source_nodes_1bd69f03</id>
+    <datasource>./p2u_ilp_2edge_solution_3857_1786485809.gpkg|layername=solution_source_nodes</datasource>
+    <layername>ILP source nodes</layername>
+    <srs>
+      <spatialrefsys>
+        <authid>EPSG:3857</authid>
+        <description>WGS 84 / Pseudo-Mercator</description>
+        <projectionacronym>merc</projectionacronym>
+        <ellipsoidacronym>EPSG:7030</ellipsoidacronym>
+        <geographicflag>false</geographicflag>
+      </spatialrefsys>
+    </srs>
+    <provider encoding="UTF-8">ogr</provider>
+      <renderer-v2 type="singleSymbol">
+        <symbols>
+          <symbol alpha="1" type="marker" name="0">
+            <layer enabled="1" class="SimpleMarker">
+              <Option type="Map">
+                <Option name="color" type="QString" value="18,18,18,255"/>
+                <Option name="outline_color" type="QString" value="255,255,255,255"/>
+                <Option name="outline_width" type="QString" value="0.35"/>
+                <Option name="outline_width_unit" type="QString" value="MM"/>
+                <Option name="size" type="QString" value="2.6"/>
+                <Option name="size_unit" type="QString" value="MM"/>
+              </Option>
+            </layer>
+          </symbol>
+        </symbols>
+      </renderer-v2>
+  </maplayer>
+  </projectlayers>
+</qgis>

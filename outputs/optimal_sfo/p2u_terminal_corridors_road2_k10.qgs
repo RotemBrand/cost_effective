@@ -1,0 +1,168 @@
+<!DOCTYPE qgis PUBLIC 'http://mrcc.com/qgis.dtd' 'SYSTEM'>
+<qgis version="3.34.0" projectname="P2U terminal corridors">
+  <homePath path="."/>
+  <title>P2U terminal corridors</title>
+  <layer-tree-group checked="Qt::Checked" expanded="1" name="">
+    <customproperties/>
+    <layer-tree-group checked="Qt::Checked" expanded="1" name="P2U terminal corridor graph">
+      <layer-tree-layer checked="1" id="ilp_edges_5f76b9cd" name="ILP edges" source="./p2u_terminal_corridors_road2_k10_3857.gpkg|layername=ilp_edges"/>
+      <layer-tree-layer checked="1" id="ilp_transformer_nodes_8755a858" name="ILP transformer nodes" source="./p2u_terminal_corridors_road2_k10_3857.gpkg|layername=ilp_transformer_nodes"/>
+      <layer-tree-layer checked="1" id="ilp_source_nodes_1b7c0c88" name="ILP source nodes" source="./p2u_terminal_corridors_road2_k10_3857.gpkg|layername=ilp_source_nodes"/>
+      <layer-tree-layer checked="0" id="raw_terminal_edges_2988614c" name="Raw terminal-minor edges" source="./p2u_terminal_corridors_road2_k10_3857.gpkg|layername=raw_terminal_edges"/>
+      <layer-tree-layer checked="0" id="raw_terminal_nodes_d0e94731" name="Raw terminal-minor nodes" source="./p2u_terminal_corridors_road2_k10_3857.gpkg|layername=raw_terminal_nodes"/>
+    </layer-tree-group>
+  </layer-tree-group>
+  <projectlayers>
+  <maplayer type="vector" geometry="Line">
+    <id>ilp_edges_5f76b9cd</id>
+    <datasource>./p2u_terminal_corridors_road2_k10_3857.gpkg|layername=ilp_edges</datasource>
+    <layername>ILP edges</layername>
+    <srs>
+      <spatialrefsys>
+        <authid>EPSG:3857</authid>
+        <description>WGS 84 / Pseudo-Mercator</description>
+        <projectionacronym>merc</projectionacronym>
+        <ellipsoidacronym>EPSG:7030</ellipsoidacronym>
+        <geographicflag>false</geographicflag>
+      </spatialrefsys>
+    </srs>
+    <provider encoding="UTF-8">ogr</provider>
+      <renderer-v2 type="singleSymbol">
+        <symbols>
+          <symbol alpha="1" type="line" name="0">
+            <layer enabled="1" class="SimpleLine">
+              <Option type="Map">
+                <Option name="line_color" type="QString" value="163,76,156,255"/>
+                <Option name="line_style" type="QString" value="solid"/>
+                <Option name="line_width" type="QString" value="0.65"/>
+                <Option name="line_width_unit" type="QString" value="MM"/>
+              </Option>
+            </layer>
+          </symbol>
+        </symbols>
+      </renderer-v2>
+  </maplayer>
+  <maplayer type="vector" geometry="Point">
+    <id>ilp_transformer_nodes_8755a858</id>
+    <datasource>./p2u_terminal_corridors_road2_k10_3857.gpkg|layername=ilp_transformer_nodes</datasource>
+    <layername>ILP transformer nodes</layername>
+    <srs>
+      <spatialrefsys>
+        <authid>EPSG:3857</authid>
+        <description>WGS 84 / Pseudo-Mercator</description>
+        <projectionacronym>merc</projectionacronym>
+        <ellipsoidacronym>EPSG:7030</ellipsoidacronym>
+        <geographicflag>false</geographicflag>
+      </spatialrefsys>
+    </srs>
+    <provider encoding="UTF-8">ogr</provider>
+      <renderer-v2 type="singleSymbol">
+        <symbols>
+          <symbol alpha="1" type="marker" name="0">
+            <layer enabled="1" class="SimpleMarker">
+              <Option type="Map">
+                <Option name="color" type="QString" value="255,255,255,0"/>
+                <Option name="outline_color" type="QString" value="203,64,60,255"/>
+                <Option name="outline_width" type="QString" value="0.35"/>
+                <Option name="outline_width_unit" type="QString" value="MM"/>
+                <Option name="size" type="QString" value="1.25"/>
+                <Option name="size_unit" type="QString" value="MM"/>
+              </Option>
+            </layer>
+          </symbol>
+        </symbols>
+      </renderer-v2>
+  </maplayer>
+  <maplayer type="vector" geometry="Point">
+    <id>ilp_source_nodes_1b7c0c88</id>
+    <datasource>./p2u_terminal_corridors_road2_k10_3857.gpkg|layername=ilp_source_nodes</datasource>
+    <layername>ILP source nodes</layername>
+    <srs>
+      <spatialrefsys>
+        <authid>EPSG:3857</authid>
+        <description>WGS 84 / Pseudo-Mercator</description>
+        <projectionacronym>merc</projectionacronym>
+        <ellipsoidacronym>EPSG:7030</ellipsoidacronym>
+        <geographicflag>false</geographicflag>
+      </spatialrefsys>
+    </srs>
+    <provider encoding="UTF-8">ogr</provider>
+      <renderer-v2 type="singleSymbol">
+        <symbols>
+          <symbol alpha="1" type="marker" name="0">
+            <layer enabled="1" class="SimpleMarker">
+              <Option type="Map">
+                <Option name="color" type="QString" value="18,18,18,255"/>
+                <Option name="outline_color" type="QString" value="255,255,255,255"/>
+                <Option name="outline_width" type="QString" value="0.35"/>
+                <Option name="outline_width_unit" type="QString" value="MM"/>
+                <Option name="size" type="QString" value="2.5"/>
+                <Option name="size_unit" type="QString" value="MM"/>
+              </Option>
+            </layer>
+          </symbol>
+        </symbols>
+      </renderer-v2>
+  </maplayer>
+  <maplayer type="vector" geometry="Line">
+    <id>raw_terminal_edges_2988614c</id>
+    <datasource>./p2u_terminal_corridors_road2_k10_3857.gpkg|layername=raw_terminal_edges</datasource>
+    <layername>Raw terminal-minor edges</layername>
+    <srs>
+      <spatialrefsys>
+        <authid>EPSG:3857</authid>
+        <description>WGS 84 / Pseudo-Mercator</description>
+        <projectionacronym>merc</projectionacronym>
+        <ellipsoidacronym>EPSG:7030</ellipsoidacronym>
+        <geographicflag>false</geographicflag>
+      </spatialrefsys>
+    </srs>
+    <provider encoding="UTF-8">ogr</provider>
+      <renderer-v2 type="singleSymbol">
+        <symbols>
+          <symbol alpha="1" type="line" name="0">
+            <layer enabled="1" class="SimpleLine">
+              <Option type="Map">
+                <Option name="line_color" type="QString" value="80,120,190,180"/>
+                <Option name="line_style" type="QString" value="solid"/>
+                <Option name="line_width" type="QString" value="0.35"/>
+                <Option name="line_width_unit" type="QString" value="MM"/>
+              </Option>
+            </layer>
+          </symbol>
+        </symbols>
+      </renderer-v2>
+  </maplayer>
+  <maplayer type="vector" geometry="Point">
+    <id>raw_terminal_nodes_d0e94731</id>
+    <datasource>./p2u_terminal_corridors_road2_k10_3857.gpkg|layername=raw_terminal_nodes</datasource>
+    <layername>Raw terminal-minor nodes</layername>
+    <srs>
+      <spatialrefsys>
+        <authid>EPSG:3857</authid>
+        <description>WGS 84 / Pseudo-Mercator</description>
+        <projectionacronym>merc</projectionacronym>
+        <ellipsoidacronym>EPSG:7030</ellipsoidacronym>
+        <geographicflag>false</geographicflag>
+      </spatialrefsys>
+    </srs>
+    <provider encoding="UTF-8">ogr</provider>
+      <renderer-v2 type="singleSymbol">
+        <symbols>
+          <symbol alpha="1" type="marker" name="0">
+            <layer enabled="1" class="SimpleMarker">
+              <Option type="Map">
+                <Option name="color" type="QString" value="255,255,255,0"/>
+                <Option name="outline_color" type="QString" value="120,120,120,180"/>
+                <Option name="outline_width" type="QString" value="0.35"/>
+                <Option name="outline_width_unit" type="QString" value="MM"/>
+                <Option name="size" type="QString" value="0.9"/>
+                <Option name="size_unit" type="QString" value="MM"/>
+              </Option>
+            </layer>
+          </symbol>
+        </symbols>
+      </renderer-v2>
+  </maplayer>
+  </projectlayers>
+</qgis>
