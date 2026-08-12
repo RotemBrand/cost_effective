@@ -800,29 +800,101 @@ def _raw_three_edge_components_networkx(analysis_graph: nx.Graph) -> list[set[An
 
 
 def _raw_three_edge_components_projection(analysis_graph: nx.Graph) -> list[set[Any]]:
-    projection = _load_cascading_projection_detector()
-    return [
-        set(component)
-        for component in projection(
-            analysis_graph,
-            k=3,
-            min_skeleton_nodes=2,
+    cut_detector = _load_cascading_projection_cut_detector()
+    raw_components: list[set[Any]] = []
+    for nodes in nx.connected_components(analysis_graph):
+        subgraph = analysis_graph.subgraph(nodes).copy()
+        skeleton_nodes = {node for node in subgraph.nodes if not _is_reduced_edge_node(node)}
+        if len(skeleton_nodes) < 2:
+            continue
+        raw_components.extend(
+            _raw_three_edge_components_from_two_cuts(
+                subgraph,
+                cut_detector(subgraph),
+                min_skeleton_nodes=2,
+            )
         )
+    return raw_components
+
+
+def _raw_three_edge_components_from_two_cuts(
+    analysis_graph: nx.Graph,
+    two_edge_cuts: Iterable[tuple[tuple[Any, Any], tuple[Any, Any]]],
+    *,
+    min_skeleton_nodes: int,
+) -> list[set[Any]]:
+    """Return skeleton 3-edge components from algebraic two-edge-cut classes.
+
+    In a bridgeless component, two-edge cuts form edge equivalence classes.
+    Removing all nontrivial cut-class edges leaves the 3-edge-connected
+    skeleton blocks. This avoids copying the full graph once per detected cut.
+    """
+    edge_parent = {edge_key(u, v): edge_key(u, v) for u, v in analysis_graph.edges}
+
+    def find(edge: tuple[Any, Any]) -> tuple[Any, Any]:
+        parent = edge_parent[edge]
+        if parent != edge:
+            edge_parent[edge] = find(parent)
+        return edge_parent[edge]
+
+    def union(edge_a: tuple[Any, Any], edge_b: tuple[Any, Any]) -> None:
+        root_a = find(edge_a)
+        root_b = find(edge_b)
+        if root_a != root_b:
+            edge_parent[root_b] = root_a
+
+    for raw_a, raw_b in two_edge_cuts:
+        if _share_reduced_edge_node(raw_a, raw_b):
+            continue
+        edge_a = edge_key(*raw_a)
+        edge_b = edge_key(*raw_b)
+        if edge_a not in edge_parent or edge_b not in edge_parent:
+            continue
+        union(edge_a, edge_b)
+
+    classes: dict[tuple[Any, Any], list[tuple[Any, Any]]] = {}
+    for edge in edge_parent:
+        classes.setdefault(find(edge), []).append(edge)
+    separator_edges = [
+        edge
+        for edges in classes.values()
+        if len(edges) >= 2
+        for edge in edges
     ]
 
+    reduced = analysis_graph.copy()
+    reduced.remove_edges_from(separator_edges)
+    components: list[set[Any]] = []
+    for nodes in nx.connected_components(reduced):
+        skeleton = {node for node in nodes if not _is_reduced_edge_node(node)}
+        if len(skeleton) >= min_skeleton_nodes:
+            components.append(skeleton)
+    return components
 
-def _load_cascading_projection_detector():
+
+def _is_reduced_edge_node(node: Any) -> bool:
+    return isinstance(node, tuple) and len(node) >= 1 and node[0] == "reduced_edge"
+
+
+def _share_reduced_edge_node(edge_a: tuple[Any, Any], edge_b: tuple[Any, Any]) -> bool:
+    return bool(
+        {_node for _node in edge_a if _is_reduced_edge_node(_node)}
+        & {_node for _node in edge_b if _is_reduced_edge_node(_node)}
+    )
+
+
+def _load_cascading_projection_cut_detector():
     try:
-        from dc_graph.structure import _raw_components_projection
+        from dc_graph.structure import _near_zero_two_edge_cuts_from_projection
 
-        return _raw_components_projection
+        return _near_zero_two_edge_cuts_from_projection
     except ModuleNotFoundError:
         sibling = Path(__file__).resolve().parents[2] / "cascading"
         if sibling.exists():
             sys.path.insert(0, str(sibling))
-            from dc_graph.structure import _raw_components_projection
+            from dc_graph.structure import _near_zero_two_edge_cuts_from_projection
 
-            return _raw_components_projection
+            return _near_zero_two_edge_cuts_from_projection
         raise ModuleNotFoundError(
             "Projection-based 3-edge decomposition requires the sibling "
             f"cascading project at {sibling}"

@@ -1,0 +1,204 @@
+<!DOCTYPE qgis PUBLIC 'http://mrcc.com/qgis.dtd' 'SYSTEM'>
+<qgis version="3.34.0" projectname="P2U final optimized network">
+  <homePath path="."/>
+  <title>P2U final optimized network</title>
+  <layer-tree-group checked="Qt::Checked" expanded="1" name="">
+    <customproperties/>
+    <layer-tree-group checked="Qt::Checked" expanded="1" name="P2U final optimized network">
+      <layer-tree-layer checked="1" id="backbone_normally_closed_c142ac02" name="Backbone normally closed lines" source="./p2u_final_network_Rmax171_streetforest.style_layers.gpkg|layername=backbone_normally_closed"/>
+      <layer-tree-layer checked="1" id="backbone_normally_open_ties_ad74edf3" name="Backbone normally open ties" source="./p2u_final_network_Rmax171_streetforest.style_layers.gpkg|layername=backbone_normally_open_ties"/>
+      <layer-tree-layer checked="1" id="final_tree_attachment_edges_a51991ef" name="Radial tree attachments" source="./p2u_final_network_Rmax171_streetforest_3857.gpkg|layername=final_tree_attachment_edges"/>
+      <layer-tree-layer checked="1" id="final_transformer_nodes_9cc0a42d" name="Transformer terminals" source="./p2u_final_network_Rmax171_streetforest_3857.gpkg|layername=final_transformer_nodes"/>
+      <layer-tree-layer checked="1" id="final_source_nodes_2d3d5024" name="Sources" source="./p2u_final_network_Rmax171_streetforest_3857.gpkg|layername=final_source_nodes"/>
+      <layer-tree-layer checked="1" id="final_street_branch_nodes_7c1db8a2" name="Street branch nodes" source="./p2u_final_network_Rmax171_streetforest_3857.gpkg|layername=final_street_branch_nodes"/>
+    </layer-tree-group>
+  </layer-tree-group>
+  <projectlayers>
+  <maplayer type="vector" geometry="Line">
+    <id>backbone_normally_closed_c142ac02</id>
+    <datasource>./p2u_final_network_Rmax171_streetforest.style_layers.gpkg|layername=backbone_normally_closed</datasource>
+    <layername>Backbone normally closed lines</layername>
+    <srs>
+      <spatialrefsys>
+        <authid>EPSG:3857</authid>
+        <description>WGS 84 / Pseudo-Mercator</description>
+        <projectionacronym>merc</projectionacronym>
+        <ellipsoidacronym>EPSG:7030</ellipsoidacronym>
+        <geographicflag>false</geographicflag>
+      </spatialrefsys>
+    </srs>
+    <provider encoding="UTF-8">ogr</provider>
+      <renderer-v2 type="singleSymbol">
+        <symbols>
+          <symbol alpha="1" type="line" name="0">
+            <layer enabled="1" class="SimpleLine">
+              <Option type="Map">
+                <Option name="line_color" type="QString" value="203,64,60,255"/>
+                <Option name="line_style" type="QString" value="solid"/>
+                <Option name="line_width" type="QString" value="0.70"/>
+                <Option name="line_width_unit" type="QString" value="MM"/>
+                <Option name="capstyle" type="QString" value="round"/>
+                <Option name="joinstyle" type="QString" value="round"/>
+              </Option>
+            </layer>
+          </symbol>
+        </symbols>
+      </renderer-v2>
+  </maplayer>
+  <maplayer type="vector" geometry="Line">
+    <id>backbone_normally_open_ties_ad74edf3</id>
+    <datasource>./p2u_final_network_Rmax171_streetforest.style_layers.gpkg|layername=backbone_normally_open_ties</datasource>
+    <layername>Backbone normally open ties</layername>
+    <srs>
+      <spatialrefsys>
+        <authid>EPSG:3857</authid>
+        <description>WGS 84 / Pseudo-Mercator</description>
+        <projectionacronym>merc</projectionacronym>
+        <ellipsoidacronym>EPSG:7030</ellipsoidacronym>
+        <geographicflag>false</geographicflag>
+      </spatialrefsys>
+    </srs>
+    <provider encoding="UTF-8">ogr</provider>
+      <renderer-v2 type="singleSymbol">
+        <symbols>
+          <symbol alpha="1" type="line" name="0">
+            <layer enabled="1" class="SimpleLine">
+              <Option type="Map">
+                <Option name="line_color" type="QString" value="245,157,35,255"/>
+                <Option name="line_style" type="QString" value="dash"/>
+                <Option name="line_width" type="QString" value="0.95"/>
+                <Option name="line_width_unit" type="QString" value="MM"/>
+                <Option name="capstyle" type="QString" value="round"/>
+                <Option name="joinstyle" type="QString" value="round"/>
+              </Option>
+            </layer>
+          </symbol>
+        </symbols>
+      </renderer-v2>
+  </maplayer>
+  <maplayer type="vector" geometry="Line">
+    <id>final_tree_attachment_edges_a51991ef</id>
+    <datasource>./p2u_final_network_Rmax171_streetforest_3857.gpkg|layername=final_tree_attachment_edges</datasource>
+    <layername>Radial tree attachments</layername>
+    <srs>
+      <spatialrefsys>
+        <authid>EPSG:3857</authid>
+        <description>WGS 84 / Pseudo-Mercator</description>
+        <projectionacronym>merc</projectionacronym>
+        <ellipsoidacronym>EPSG:7030</ellipsoidacronym>
+        <geographicflag>false</geographicflag>
+      </spatialrefsys>
+    </srs>
+    <provider encoding="UTF-8">ogr</provider>
+      <renderer-v2 type="singleSymbol">
+        <symbols>
+          <symbol alpha="1" type="line" name="0">
+            <layer enabled="1" class="SimpleLine">
+              <Option type="Map">
+                <Option name="line_color" type="QString" value="77,175,74,210"/>
+                <Option name="line_style" type="QString" value="dash"/>
+                <Option name="line_width" type="QString" value="0.35"/>
+                <Option name="line_width_unit" type="QString" value="MM"/>
+                <Option name="capstyle" type="QString" value="round"/>
+                <Option name="joinstyle" type="QString" value="round"/>
+              </Option>
+            </layer>
+          </symbol>
+        </symbols>
+      </renderer-v2>
+  </maplayer>
+  <maplayer type="vector" geometry="Point">
+    <id>final_transformer_nodes_9cc0a42d</id>
+    <datasource>./p2u_final_network_Rmax171_streetforest_3857.gpkg|layername=final_transformer_nodes</datasource>
+    <layername>Transformer terminals</layername>
+    <srs>
+      <spatialrefsys>
+        <authid>EPSG:3857</authid>
+        <description>WGS 84 / Pseudo-Mercator</description>
+        <projectionacronym>merc</projectionacronym>
+        <ellipsoidacronym>EPSG:7030</ellipsoidacronym>
+        <geographicflag>false</geographicflag>
+      </spatialrefsys>
+    </srs>
+    <provider encoding="UTF-8">ogr</provider>
+      <renderer-v2 type="singleSymbol">
+        <symbols>
+          <symbol alpha="1" type="marker" name="0">
+            <layer enabled="1" class="SimpleMarker">
+              <Option type="Map">
+                <Option name="color" type="QString" value="255,255,255,0"/>
+                <Option name="outline_color" type="QString" value="55,55,55,255"/>
+                <Option name="outline_width" type="QString" value="0.35"/>
+                <Option name="outline_width_unit" type="QString" value="MM"/>
+                <Option name="size" type="QString" value="0.95"/>
+                <Option name="size_unit" type="QString" value="MM"/>
+              </Option>
+            </layer>
+          </symbol>
+        </symbols>
+      </renderer-v2>
+  </maplayer>
+  <maplayer type="vector" geometry="Point">
+    <id>final_source_nodes_2d3d5024</id>
+    <datasource>./p2u_final_network_Rmax171_streetforest_3857.gpkg|layername=final_source_nodes</datasource>
+    <layername>Sources</layername>
+    <srs>
+      <spatialrefsys>
+        <authid>EPSG:3857</authid>
+        <description>WGS 84 / Pseudo-Mercator</description>
+        <projectionacronym>merc</projectionacronym>
+        <ellipsoidacronym>EPSG:7030</ellipsoidacronym>
+        <geographicflag>false</geographicflag>
+      </spatialrefsys>
+    </srs>
+    <provider encoding="UTF-8">ogr</provider>
+      <renderer-v2 type="singleSymbol">
+        <symbols>
+          <symbol alpha="1" type="marker" name="0">
+            <layer enabled="1" class="SimpleMarker">
+              <Option type="Map">
+                <Option name="color" type="QString" value="18,18,18,255"/>
+                <Option name="outline_color" type="QString" value="255,255,255,255"/>
+                <Option name="outline_width" type="QString" value="0.35"/>
+                <Option name="outline_width_unit" type="QString" value="MM"/>
+                <Option name="size" type="QString" value="2.5"/>
+                <Option name="size_unit" type="QString" value="MM"/>
+              </Option>
+            </layer>
+          </symbol>
+        </symbols>
+      </renderer-v2>
+  </maplayer>
+  <maplayer type="vector" geometry="Point">
+    <id>final_street_branch_nodes_7c1db8a2</id>
+    <datasource>./p2u_final_network_Rmax171_streetforest_3857.gpkg|layername=final_street_branch_nodes</datasource>
+    <layername>Street branch nodes</layername>
+    <srs>
+      <spatialrefsys>
+        <authid>EPSG:3857</authid>
+        <description>WGS 84 / Pseudo-Mercator</description>
+        <projectionacronym>merc</projectionacronym>
+        <ellipsoidacronym>EPSG:7030</ellipsoidacronym>
+        <geographicflag>false</geographicflag>
+      </spatialrefsys>
+    </srs>
+    <provider encoding="UTF-8">ogr</provider>
+      <renderer-v2 type="singleSymbol">
+        <symbols>
+          <symbol alpha="1" type="marker" name="0">
+            <layer enabled="1" class="SimpleMarker">
+              <Option type="Map">
+                <Option name="color" type="QString" value="255,255,255,0"/>
+                <Option name="outline_color" type="QString" value="120,120,120,180"/>
+                <Option name="outline_width" type="QString" value="0.35"/>
+                <Option name="outline_width_unit" type="QString" value="MM"/>
+                <Option name="size" type="QString" value="0.65"/>
+                <Option name="size_unit" type="QString" value="MM"/>
+              </Option>
+            </layer>
+          </symbol>
+        </symbols>
+      </renderer-v2>
+  </maplayer>
+  </projectlayers>
+</qgis>
