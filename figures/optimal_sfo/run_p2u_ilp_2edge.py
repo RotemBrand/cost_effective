@@ -94,6 +94,7 @@ def solve_min_2edge(
     threads: int,
     max_cut_rounds: int,
     cut_mode: str = "iterative",
+    warm_start_edges: set[tuple[str, str]] | None = None,
 ) -> tuple[nx.Graph | None, dict]:
     if redundancy is not None and max_redundancy is not None:
         raise ValueError("Use either exact redundancy or max_redundancy, not both")
@@ -118,6 +119,11 @@ def solve_min_2edge(
         model.Params.LazyConstraints = 1
 
     x = model.addVars(edges, vtype=GRB.BINARY, name="x")
+    warm_start_edges = {_edge_key(u, v) for u, v in (warm_start_edges or set())}
+    warm_start_edges = {edge for edge in warm_start_edges if edge in x}
+    if warm_start_edges:
+        for edge in warm_start_edges:
+            x[edge].Start = 1.0
     for node in nodes:
         model.addConstr(gp.quicksum(x[e] for e in incident[node]) >= 2, name=f"deg2[{node}]")
 
@@ -249,6 +255,7 @@ def solve_min_2edge(
             "requested_mip_gap": mip_gap,
             "cut_mode": cut_mode,
             "source_connectivity_constraints": source_connectivity_constraints,
+            "warm_start_edges": len(warm_start_edges),
         }
 
     solution = nx.Graph()
@@ -282,6 +289,7 @@ def solve_min_2edge(
         "requested_mip_gap": mip_gap,
         "cut_mode": cut_mode,
         "source_connectivity_constraints": source_connectivity_constraints,
+        "warm_start_edges": len(warm_start_edges),
         "selected_original_sources_with_incident_edge": _count_selected_sources(solution, original_source_incident),
         "original_sources_with_candidate_edges": len([s for s, es in (original_source_incident or {}).items() if es]),
     }

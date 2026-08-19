@@ -1,0 +1,562 @@
+\documentclass[oneside, a4paper, onecolumn, 11pt]{article}
+%\documentclass[preprint, 2columns]{revtex4}
+\usepackage[left=2.5cm,top=2.5cm,bottom=2.5cm,right=2.5cm]{geometry}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{fancyhdr}
+\usepackage{calc}
+\usepackage{amssymb}
+% \usepackage[super,sort&compress,comma]{natbib}
+\usepackage{setspace}
+\usepackage{amsfonts}
+\usepackage{commath}
+\usepackage[innercaption]{sidecap}
+%\usepackage{tcolorbox}
+\usepackage[framemethod=TikZ]{mdframed}
+\usepackage{wrapfig}
+\usepackage{hyperref}
+\usepackage{parskip}
+\usepackage{mathrsfs}
+\usepackage{verbatim}
+\usepackage[english]{babel}
+\usepackage{amsthm}
+\usepackage[normalem]{ulem}
+\usepackage{amssymb}
+\usepackage{todonotes}
+\usepackage[backend=biber,style=nature,natbib=true]{biblatex}
+\addbibresource{bib.bib}
+
+
+\newcommand{\rom}[1]{\romannumeral #1}
+\newcommand{\Rom}[1]{\expandafter\@slowromancap\romannumeral #1@}
+\makeatother
+\newtheorem{definition}{Definition}[section]{ \normalfont} %% numbering the definition by section
+\newtheorem{theorem}[definition]{Theorem}%% numbering the theorem by section
+\newtheorem{lemma}[definition]{Lemma}%% numbering the theorem by section
+\newtheorem{question}[definition]{Question}%% numbering the theorem by section
+\newtheorem{note}[definition]{Note}%% numbering the theorem by section
+
+\expandafter\def\expandafter\normalsize\expandafter{%
+	\normalsize
+	\setlength\abovedisplayskip{0pt}
+	\setlength\belowdisplayskip{5pt}
+	\setlength\abovedisplayshortskip{0pt}
+	\setlength\belowdisplayshortskip{5pt}
+}
+\renewcommand{\baselinestretch}{1.1}
+\setlength{\parindent}{0em}
+\setlength{\parskip}{5pt}
+
+\newcommand{\av}[1]{\langle #1 \rangle}
+\newcommand{\M}{\mathcal M}
+\newcommand{\X}{\mathcal X}
+\newcommand{\G}{\mathcal G}
+\newcommand{\baruch}[1]{{\color{red}[\textbf{BB: #1}]}}
+\newcommand{\todocite}[2]{\todo[color=cyan!30]{#1}#2}
+
+\definecolor{Gray}{gray}{0.75}
+
+\newmdenv[backgroundcolor=Gray, leftmargin = 0pt, rightmargin = 0pt, linewidth = 0pt, roundcorner = 2 pt, innerleftmargin=5pt, innerrightmargin=5pt, innertopmargin=5pt, innerbottommargin=5pt]{Frame}
+
+%\numberwithin{equation}{section}            %% numbering the equation by section
+\begin{document}
+
+\begin{center}
+{\color{blue} \LARGE \textbf{Cost-effective network robustness}}
+
+
+\vspace{3mm}
+Rotem Brand$^{1,2}$, Simcha Haber$^{1}$,  Reuven Cohen$^{1}$, Avi Leon$^{3}$, Tomer Ron$^{3}$, Emanuel Zuckerberger$^{3}$, Sorin Avram$^{3}$, Shachar Ganem Thabit$^{3}$ \& Baruch Barzel$^{1,2}$ 
+\end{center}
+
+\begin{enumerate}
+\small{
+\item
+Department of Mathematics, Bar-Ilan University, Ramat-Gan, Israel 
+\item
+Gonda Multidisciplinary Brain Research Center, Bar-Ilan University, Ramat-Gan, Israel
+\item 
+Israel Electric Company, Haifa, Israel
+}
+\end{enumerate}
+
+\vspace{2mm}
+
+\hspace{-2.27mm} 
+\textbf{
+Modern society relies heavily on infrastructure networks, from communication to power systems, making their reliability under failure and disruption critical. Robustness typically requires redundancy, providing alternative paths that ensure continuous service, yet redundancy is costly and often limited. Real-world networks therefore operate under a fundamental trade-off between resource investment and reliability. Here we derive theoretical bounds governing this trade-off and identify the network architectures that minimize expected downtime under constraints of cost, component durability, and spatial embedding. We show that, in the relevant limit, optimal configurations consist of a $3$-connected structural core linked by intermediate chains of uniform weight. This reveals a previously unrecognized family of spatial networks that achieves near-optimal robustness with orders-of-magnitude fewer resources. Distinct from commonly studied network models, these architectures expose general structural principles underlying the efficient organization of reliable infrastructure networks.
+}
+
+\begin{refsection}
+
+Critical infrastructure — power lines, communication channels, transportation routes, and water and sewage networks — is often pushed to its limits~\supercite{PowerResilience,prudhvi2025vulnerability}. Scarce resources and growing demand frequently produce sparse, cost-minimized networks that are highly vulnerable to local, sporadic failures~\supercite{cohen2000resilience,motter2002cascade,universal_gao_2016,robustness_artime_2024,albert2000error}.
+
+To balance cost and reliability, we seek optimized networks that incorporate a minimal number of redundant links while preserving robustness. In practice, this is often achieved by introducing a limited set of carefully placed connections that guarantee at least two disjoint paths between each pair of nodes~\supercite{JainRaviSingh03,TarjanConencted,kerivin2005design,Frederickson1981ApproximationAF,SeboeVygen14,monma1989methods}. Such redundancy produces $2$-connected graph structures, ensuring that no single link failure can isolate nodes, thereby reducing the probability of service loss~\supercite{moore1956reliable,Boesch1986OnUP,wang1997structure,On_the_validity,romero2021uniformly}
+
+The challenge, we show here, is that the reliability of such $2$-connected networks decreases asymptotically with network size $N$, and therefore they become inevitably unstable as $N$ grows. To address this, we analytically derive the reliability phase-space, uncovering how the interplay among network size $N$, link redundancy $R$, and component failure probability $p$ jointly determine the network’s reliability $F$. This allows us to identify the optimal graph structures that maximize reliability under the given resources.
+
+Ultimately, our theory leads to a universal algorithm that ingests the spatial~\supercite{spatial_barthelemy_2010,shape_gastner_2020,Shekhtman2014RobustnessOA,tomassini2025enhancing,catastrophic_buldyrev_2010,complex_vespignani_2010} configuration of nodes and the upper bound on allowable redundancy, and outputs the optimal network that maximizes reliability. When tested on both simulated and real-world infrastructure networks, we find that reliability can be improved — sometimes by orders of magnitude — not through additional resources, but by optimally deploying the existing network capacity.
+
+\vspace{3mm}
+\textbf{\Large \color{blue} Modeling framework}
+
+Consider an infrastructure network, such as a power or communication system, whose connectivity is described by the graph $G(S,V,E)$. Here $V = \{1,\dots,N\}$ denotes the set of system nodes, of which $S = \{1,\dots,K\} \subseteq V$ represents the subset of source nodes, or generators, while the remaining nodes act as consumers. The set $E = \{1,\dots,L\}$ enumerates the system’s $L$ undirected links. The network is fully functional as long as every consumer $v \in V$ is connected to at least one source $s \in S$ via a finite path, \textit{i.e.}, $v \leftrightarrow S$. If, however, a node $v$ cannot reach any source through the existing network paths, namely $v \nleftrightarrow S$, it is denied service until connectivity to $S$ is restored.
+
+In power systems, we typically consider a small number of sources, with $K \sim O(1)$, reflecting the fact that each generator serves multiple consumers. In other systems, such as communication~\supercite{neumayer2011assessing} or transportation, this distinction is absent:\ nodes can both send and receive flows of information or passengers, and hence $S$ covers most or all of $V$ and $K \sim O(N)$. Our analysis is designed to accommodate both types of networks. However, the differing nature of the $S$–$V$ relationship requires dedicated treatment in each case. Accordingly, we focus here primarily on power networks, and leave the generalization to multi-source networks to Supplementary Section~1.
+
+\vspace{3mm}
+\textbf{\color{blue} Cost}.\
+In $G$, the links require investment of material resources, such as wires, cables or pipelines, and hence the infrastructure wiring cost amounts to
+
+\begin{equation}
+C = \sum_{l \in E} c \lambda_l = c \lambda_{\text{Net}},
+\label{eq:Cost}
+\end{equation}
+
+where $c$ is the link cost per unit length and $\lambda_l$ is the length of the $l$th link; $\lambda_{\text{Net}} = L \av \lambda$ denotes the total length of all links in $G$. To reduce construction expenses, we seek to connect all consumers to $S$, while minimizing $C$. As a result the network graph is typically sparse (small $L$), and the links are mostly local (small $\lambda_l$), extended between geographically proximate nodes.  
+
+\vspace{3mm}
+\textbf{\color{blue} Service reliability}.\ 
+The challenge is that an overly parsimonious $G$, while cost-effective, incurs the risk of service loss due to link failures. Hence, we denote the link failure probability by $p_l = p \lambda_l$, where $p$, the average failure probability per unit length, represents the intrinsic component risk~\supercite{allan2013reliability,neumayer2011assessing}. We assume the limit where $p_l \ll 1$, \textit{i.e}.\ individual links are generally stable. For a given network $G$ and component risk $p$, we seek the System Average Interruption Duration Index (SAIDI)~\supercite{allan2013reliability,IEEE_guide,trifunovic2006water} 
+
+\begin{equation}
+F = \frac{1}{W}\sum_{v \in V} w_v P(S \nleftrightarrow v \mid G,p),
+\label{SAIDI}
+\end{equation}
+
+where $P(S \nleftrightarrow v | G,p)$ is the probability that a consumer $v$ experiences service denial over time, and $w_v$ denotes the consumer weight, prioritizing, \textit{e.g}., critical infrastructure over residential users, who may tolerate occasional service disruption. The index in \eqref{SAIDI} is normalized by $W = \sum_{v \in V} w_v$, ensuring $0 \le F \le 1$. 
+
+The SAIDI index $F$ is frequently used to quantify the impact of sporadic link failures on network reliability in power, communication, and transport systems~\supercite{colbourn1987combinatorics,trifunovic2006water,perez2018sixty,bolch2006queueing,monte_carlo} (Supplementary Section~1.2). It is designed to capture service continuity by quantifying the average fraction of consumers denied service at any given time, or equivalently, the average duration of service denial per consumer per unit time. Hence, $F \to 0$ indicates a highly reliable network, whereas $F \sim 1$ corresponds to a network in a constant state of failure. 
+
+Our goal is to design optimal networks $G$ that, for a given component risk $p$, minimize both the SAIDI index $F$ in \eqref{SAIDI} and the construction cost $C$ in \eqref{eq:Cost}. This optimization is subject to constraints imposed by the spatial layout of sources $S$ and consumers in $V$. In particular, the network must ensure that when all links are operational, every consumer remains connected to at least one source, \textit{i.e.}\ $v \leftrightarrow S$ for all $v \in V$. This requirement sets a lower bound of $L = N$ links, guaranteeing at least one incoming link per consumer. 
+
+To enhance reliability we consider adding a fraction $\rho$ of redundant links, amounting to a total of $R = \rho N$ excess links, thus setting the total number of links to
+
+\begin{equation}
+L = N - 1 + R \approx (1 + \rho)N,
+\label{LNR}
+\end{equation}
+
+and the subsequent cost in \eqref{eq:Cost} to $C \approx c (1 + \rho) N \av \lambda$. With this, minimizing the overall cost is primarily achieved by maintaining a small $R$ (or small $\rho$), and, as much as possible, also by avoiding excessively long links (small $\lambda_l$).  
+
+
+\vspace{3mm}
+\textbf{\color{blue} \Large Results - the New York City network}
+
+To illustrate the challenge, we begin with a simulation of power distribution in New York City (NYC). We first construct the network $G$ for a sample of nodes (Fig.\ \ref{FigNYC}a), comprising $N = 600$ consumers in Manhattan, served by a single source, $s = 1$ (red). To construct the most cost-effective network we build the minimal spanning tree, which connects all vertices with exactly $N$ local links at average length $\av \lambda = 1$. This construction strictly avoids any link redundancies - therefore $R = 0$. We set the component risk to $p$ and the node weights uniformly to $w_v = 1$, then numerically evaluate $F$ via \eqref{SAIDI}. The results for selected values of $p$ are presented in Fig.\ \ref{FigNYC}b (solid lines). The average value of $F$ is also shown (dashed lines). 
+
+In Fig.\ \ref{FigNYC}c we show $F$ vs.\ $p$ as obtained from our numerical simulations. We observe that $F$ rises sharply with increasing $p$, indicating that the zero-redundancy network is potentially unreliable. For comparison, we also show the $F = p$ line (grey), which captures a state in which the \textit{network} is as reliable as its \textit{components}. To interpret this, consider a set of $N$ isolated nodes, each independently linked to the source $s$ via links of unit length. At any given time, on average, a fraction $p$ of these nodes will be denied service, and hence for this decomposed network we have $F = p$. The fact that our network features $F > p$, above this line, indicates that, in this case, the network has a destabilizing effect:\ consumers are denied service more frequently as part of the network than they would be if independently connected to $s$. In simple terms, in this regime the \textit{network} risk ($F$) is greater than the \textit{component} risk ($p$). 
+
+This observation is expected. Under $R = 0$, most nodes can reach the source $s$ only through a series of intermediate links. Hence failing any of those links along the $v \leftrightarrow s$ path is sufficient for $v$ to lose service. Another way to interpret this is to note that, in such a sparse $G$, the failure of a single link often disconnects many nodes - hence, quite naturally, we observe $F > p$.
+
+To enhance robustness, we reconfigure the system into a $2$-connected topology by forming a single closed loop that traverses all $N$ nodes (Fig.\ \ref{FigNYC}d). In this configuration, each node can reach $s$ along two disjoint directions, therefore single link failures no longer result in service loss. This wiring requires $L = N$ links, a marginal redundancy of $R = 1$. Still, even with this minor addition, we observe an improved robustness:\ the $F$–$p$ curve now falls below the grey reference line (Fig.\ \ref{FigNYC}f, see inset), revealing a window of $p$ values for which $F < p$. Within this region, the network, indeed, performs better than its individual components.
+
+The observed improvement, however, is limited. As $p$ increases beyond a threshold value $p_c$, $F$ rapidly crosses the reference line, and the network, once again, becomes unreliable. Increasing $R$ expands the reliability window (Fig.\ \ref{FigNYC}g), pushing $p_c$ upwards, but nonetheless, it remains bounded (vertical dashed lines). In all cases, once $p > p_c$, the system enters the $F > p$ \textit{runaway} zone - a state where the network injects instability and $F$ rapidly increases.
+
+This illustrates the trade-off between $p$ and $R$:\ to ensure network reliability, we must avoid the $F > p$ regime. We can achieve this either by enhancing the \textit{component} reliability, pushing $p$ below $p_c$, or by bolstering the \textit{network} reliability, adding redundancy $R$ and thus driving $p_c$ above $p$. The former approach requires investing resources in the network components, such as maintenance to decrease the failure risk $p$. The latter incurs additional construction costs due to the inclusion of redundant links. 
+
+To demonstrate this trade-off in our NYC-based network, we fix the component risk at $p = 5 \times 10^{-4}$ and search for the minimal redundancy $R$ that ensures $F < p$ (Fig.\ \ref{FigNYC}h, blue). At $R = 0$, the network yields $F = 3 \times 10^{-2}$, significantly exceeding $p$. As we gradually add redundant links, $F$ begins to decline, as expected. We find that with a relatively modest redundancy, around $R \approx 10$, or $\rho \approx 2 \times 10^{-2}$, $F$ drops below the component failure rate, entering the $F < p$ region. This identifies a critical redundancy threshold $R_c$, beyond which the network shifts from playing a destabilizing role to providing stability.        
+
+The difficulty emerges as the network is densified to serve additional consumers. In Fig.\ \ref{FigNYC}i, we progressively expand network coverage from $N = 10^2$, spanning only a small segment of Manhattan, to $N = 3 \times 10^3$, covering the entire region. As the network grows, additional sources (red) are introduced to meet the rising demand. Despite this, we observe that $F$ increases with $N$, revealing a critical network size $N_c$ beyond which the network becomes unreliable. Hence, network size itself plays a destabilizing role.
+
+Taken together, our analysis of the NYC power network illustrates the inherent challenge of achieving cost-effective robust infrastructure design. Specifically, it reveals that
+$\bullet$
+For a given component risk $p$, network reliability can be improved by introducing a modest fraction $R$ of redundant links
+$\bullet$ 
+This redundancy suppresses $F$, but only within a finite reliability window $p \le p_c$. Beyond this window the system enters the $F > p$ runaway regime - an unstable state in which reliability rapidly deteriorates
+$\bullet$
+Most critically, network size $N$ itself acts as a destabilizing factor: designs that perform well at small scale can become unreliable as the network expands. This casts severe limitations on our ability to construct reliable networks at scale. 
+
+To address these challenges, we next turn to a systematic analysis of the interplay between the three principal factors that govern network reliability:\ component durability ($p$, Fig.\ \ref{FigNYC}j), link redundancy ($R,\rho$, Fig.\ \ref{FigNYC}k), and network size ($N$, Fig.\ \ref{FigNYC}l). We seek optimal construction strategies that support large-scale ($N \gg 1$), low-cost ($\rho \ll 1$), and highly reliable ($F \ll 1$) networks.
+
+\vspace{3mm}
+\textbf{\color{blue} \Large Analysis}
+
+\textbf{\color{blue} Evaluating SAIDI}.\ 
+As illustrated in Fig.\ \ref{FigCutSets}a, sporadic link failures do not necessarily lead to service denial. A failed link $j \nleftrightarrow v$ can often be bypassed, allowing $v$ to remain connected to the sources through an alternative path $S \leftrightarrow v$. The dominant contributions to $F$ therefore arise from \textit{cut-sets} — sets of links $X \subseteq E$ whose simultaneous failure disconnects at least one node from $S$. Each cut-set partitions $G$ into two regions: the subgraph $G_S(X) \subset G$ that remains connected to $S$, and the complementary region $\overline{G}_S(X) = G / G_S(X)$ containing the disconnected nodes. An example of a cut-set with $|X| = 2$ is shown in Fig.\ \ref{FigCutSets}b. 
+
+We denote the set of all cut-sets by $\X = \{ X \subseteq E \mid \overline{G}_S(X) \ne \emptyset \}$, and the set of $m$-sized cut-sets by $\X_m = \{ X \in \X \mid |X| = m \}$. Therefore, we have $\X = \bigcup_{m = 1}^L \X_m$, a union of all equal sized cut-sets. In Supplementary Section~2.1 we use this decomposition to write~\supercite{rodionov2016practical}
+
+\begin{equation}
+F \approx \dfrac{1}{W} \sum_{m = 1}^L Z_m p^m (1 - \av \lambda p)^{L - m}
+\label{eq:SAIDIfGX}
+\end{equation}
+
+a binomial expansion with coefficients
+
+\begin{equation}
+Z_m = \sum_{X \in \X_m} \gamma_X w_X.
+\label{Zm}
+\end{equation}
+
+The expansion in \eqref{eq:SAIDIfGX} constructs $F$ as a probabilistic decomposition. The powers $p^m(1 - \av \lambda p)^{L - m}$ represent the probability of failure of an $m$-link cut-set $X \in \X_m$. The coefficients $Z_m$ capture the contribution of these $m$-sized cut-sets to $F$:\ $\gamma_X = \prod_{l \in X} \lambda_l$ accounts for the lengths of the links in $X$, reflecting the increase of failure probability with $\lambda_l$, and $w_X = \sum_{v \in \overline{G}_S(X)} w_v$ measures the total weight of the nodes disconnected by $X$.
+
+Equation~\eqref{eq:SAIDIfGX} encapsulates our first key insight, disentangling risk embedded in the \textit{network structure} from that rooted in \textit{component durability} (Fig.\ \ref{FigCutSets}c-f). Structural vulnerability is fully encoded in the coefficients $Z_m$, whereas the reliability of individual components enters solely through the powers $p^m$. In the limit of small $p$, the expansion is dominated by its lowest-order terms, implying that reducing $F$ requires minimizing $Z_m$ for $m = 1,2,\dots$. Ideally, one seeks network architectures for which these coefficients vanish at small $m$, by promoting structures whose minimal cut-sets involve many links, such that $\X_m = \emptyset$ for small $m$.
+
+Next, we use Eq.\ \eqref{eq:SAIDIfGX} to analyze a set of archetypical network structures, often encountered in infrastructure settings. 
+
+
+\vspace{3mm}
+\textbf{\color{blue} Zero-redundancy networks $G_{\rm Tree}$} (Fig.\ \ref{FigNetworks}a–c).
+We begin by setting $R = 0$, corresponding to the minimal network deployed in Fig.\ \ref{FigNYC}a. This case captures tree-like structures with no loops, including the star configuration, generic trees, and the linear chain illustrated in Fig.\ \ref{FigNetworks}a. With $R = 0$, each of the $N$ links forms a cut-set, and Eq.\ \eqref{eq:SAIDIfGX} is therefore dominated by the leading $Z_1$ term, which is linear in $p$. In Supplementary Section~2.3.1 we show that for this network family
+
+\begin{equation}
+F_{\rm Tree} = \av {w_v \lambda_{v \to S}}\cdot p + O(p^2),
+\label{FTree}
+\end{equation}
+
+where $\lambda_{v \to S}$ denotes the total length of all links along the shortest path from $v$ to $S$, and $\av{w_v \lambda_{v \to S}} = (1/W) \sum_{v = 1}^N w_v \lambda_{v \to S}$ its node-weighted average.
+
+For $p \to 0$ the linear network may seem robust. However, since $\av {w_v \lambda_{v \to S}}$ is typically greater than unity, such tree-like networks almost always reside in the $F \ge p$ regime — precisely the runaway zone that we seek to avoid.
+
+In Fig.\ \ref{FigNetworks}b we systematically analyze $10^2$ zero-redundancy networks spanning a range of sizes and connectivity patterns. For each network, the component risk is drawn randomly from $p \in (10^{-3},10^{-2})$. As predicted, we find that for nearly all realizations $F$ lies above the $F = p$ diagonal. To test Eq.\ \eqref{FTree}, we next plot $F$ against $\av{w_v \lambda_{v \to S}}p$. Strikingly, the simulated data — previously scattered across the entire $F \ge p$ region — collapse onto the predicted linear function (Fig.\ \ref{FigNetworks}c, dashed line). We thus arrive at two conclusions:\ (i) zero-redundancy networks are intrinsically unreliable; (ii) this reliability risk is accurately captured by our prediction \eqref{FTree}.
+
+\vspace{3mm}
+\textbf{\color{blue} $2$-connected networks $G_{\rm Ring}$} (Fig.\ \ref{FigNetworks}d–f).
+A natural strategy to mitigate the vulnerability of $G_{\rm Tree}$ is to introduce a small number of redundant links, $R \sim O(1)$. For clarity, we consider the limiting case $R = 1$, corresponding to a single redundant link. In this limit, the objective of eliminating small cut-sets is optimally achieved by the ring configuration $G_{\rm Ring}$ shown in Fig.\ \ref{FigNetworks}d. In $G_{\rm Ring}$ there are no $m = 1$ cut-sets, therefore $\X_1 = \emptyset$ and $Z_1 = 0$. Consequently, $F$ in Eq.\ \eqref{eq:SAIDIfGX} is dominated by the $p^2$ term. The number of $m = 2$ cut-sets is $|\X_2| = \binom{L}{2} \sim L^2$, and their average weight is $w_X = W/3$. Substituting into Eq.\ \eqref{eq:SAIDIfGX} yields
+
+\begin{equation}
+\label{FRing}
+F_{\rm Ring} \sim L^2 p^2 + O(p^3) \approx p^2 \lambda_{\text{Net}}^2,
+\end{equation}
+
+where, on the r.h.s., we replace the number of links $L$ by their total length $\lambda_{\text{Net}}$.
+
+In Eq.\ \eqref{FRing}, the quadratic dependence on $p$ ensures that for $p \ll 1$ we have $F_{\rm Ring} < p$. However, as $L$ increases, the system again reaches $F > p$, entering the runaway regime. For a given $N$, Eq.\ \eqref{FRing} predicts that this transition occurs at $p_c \sim N^{-2}$ (since in $G_{\rm Ring}$, $N \approx L$). Thus, while the ring network provides a finite window of reliability, this window narrows as $N$ increases.
+
+In Fig.\ \ref{FigNetworks}e, we measure $F_{\rm Ring}$ for rings of varying size $N$. For each ring, we identify $p_c$, as the point at which $F_{\rm Ring}$ intersects the $F = p$ line. This defines the window of reliability $p < p_c$. Plotting the extracted $p_c$ versus $N$, we find that, as predicted, that the window size scales as $N^{-2}$ (Fig.\ \ref{FigNetworks}f). Thus, larger networks exhibit a diminished stability window. 
+
+These results, though derived from simplified network structures, reproduce the $F$ patterns observed in our NYC analysis. The network remains robust for small $p$, but once $p > p_c$ reliability degrades rapidly. The qualitative trends in Fig.\ \ref{FigNYC}f,g are thus supported by quantitative, testable predictions. Most importantly, the analysis confirms our initial insight that increasing system size $N$ drives $p_c$ toward zero, thereby narrowing the reliability window.
+
+\vspace{3mm}
+\textbf{\color{blue} $3$-regular networks $G_{\rm 3Reg}$} (Fig.\ \ref{FigNetworks}g–i).
+We next consider $3$-connected networks in which all nodes have degree $k = 3$. This configuration requires $L = 3N/2$ links, a redundancy of $R = 1 + N/2$ and $\rho \approx 1/2$. In Supplementary Section~2.3.3, we use Eq.\ \eqref{eq:SAIDIfGX} to show that, with an appropriate structural arrangement,
+
+\begin{equation}
+F_{3\rm Reg} \sim N^0 p^3 + O(p^4),
+\label{F3Regular}
+\end{equation}
+
+exhibiting cubic dependence on $p$ and no polynomial dependence on $N$. This represents an ideal configuration:\ the $p^3$ scaling guarantees $F_{3\rm Reg} \ll p$, while the independence from $N$ ensures that the reliability window remains constant with system size. In other words, in the $3$-regular network we have $p_c = 1$, providing network-driven reliability across all scales.
+
+The robustness of $F_{3 \rm Reg}$ follows naturally from Eq.\ \eqref{eq:SAIDIfGX}. In $G_{\rm 3Reg}$, no cut-sets exist with size smaller than $m = 3$, so that $Z_1 = Z_2 = 0$. Unlike tree networks — where each of the $N$ links forms a cut-set, or ring networks — where every one of the $\sim N^2$ link pairs is a cut-set, here - most link triplets are \textit{not} cut-sets. Consequently, of the $\sim N^3$ possible link trios, only a handful pose a service risk. As a result, the total number of \textit{relevant} cut-sets in $\X_3$, that contribute to $Z_3$ remains nearly independent of $N$. The outcome - an ideally robust network, which maintains reliability regardless of system size.
+
+To test this, we apply the $3$-regular wiring scheme to the NYC network. As predicted, unlike $G_{\rm Tree}$ and $G_{\rm Ring}$, $F$ under this construction does not increase appreciably with $N$, consistently remaining well within the $F < p$ domain (Fig.\ \ref{FigNetworks}h,i).
+
+The $3$-regular networks offer ideal robustness. On one hand, $F_{3\rm Reg}$ decreases sharply with $p$; on the other, it remains independent of $N$. This robustness, however, comes at a substantial cost: we must add $R \sim O(N)$ links, increasing the network density from $L = N$ to $L = 3N/2$. This implies a linear increase in the cost \eqref{eq:Cost}, corresponding here to a $50\%$ budget boost, which may be practically prohibitive. In the following, we therefore focus on constructing networks that optimize reliability under a restricted budget.
+
+
+\vspace{3mm}
+\textbf{\Large \color{blue} Optimal networks}
+
+Up to this point, we considered two limiting cases:\ $G_{\rm Ring}$, with $R \sim O(1)$, and $G_{3\rm Reg}$, where $R \sim O(N)$. We now turn to the intermediate regime by considering a finite redundancy
+
+\begin{equation}
+R \sim N^\alpha,
+\label{Rho}
+\end{equation}
+
+with $0 \le \alpha \le 1$. For large $N$ and $\alpha < 1$, this scaling ensures a vanishing relative redundancy $\rho = R/N \to 0$, with smaller $\alpha$ corresponding to lower investment. Our objective is to determine the optimal network structure for a given component risk $p$, system size $N$, and available redundancy $R$ (or $\alpha$).
+
+\vspace{3mm}
+\textbf{\color{blue} Eliminating trees} (Fig.\ \ref{FigOptimization}a).\
+The first insight derived from Eqs.\ \eqref{eq:SAIDIfGX}–\eqref{F3Regular} is that tree-like components in $G$ constitute an intrinsic vulnerability, introducing multiple cut-sets of order $m = 1$. Our analysis shows that this vulnerability can be eliminated by introducing a marginal redundancy $R \sim O(1)$, sufficient to remove all tree structures without incurring a significant additional cost (Supplementary Section~3.1).
+
+\vspace{3mm}
+\textbf{\color{blue} Components of $2$-connected graphs} (Fig.\ \ref{FigOptimization}a,b).\
+Once trees are eliminated, the optimized networks are restricted to $2$-connected configurations, which contain no cut-sets of order $m < 2$ (that is, $Z_1 = |\X_1| = 0$ in \eqref{eq:SAIDIfGX}). In such networks, nodes fall into two categories:\ nodes of degree $k \ge 3$, which act as \textit{forks} (blue), and nodes of degree $k = 2$, which assemble into $Q$ \textit{intermediate chains} $U_q$ ($q = 1,\dots,Q$) connecting these forks (green). Each intermediate chain forms a closed, $2$-connected sequence of $N_q$ nodes and $L_q = N_q + 1$ links, terminating at both ends at fork nodes. 
+
+We use this partition to construct the \textit{structure graph} $G_{\text{Struct}}$, obtained by reducing $G$ to its fork nodes. Each intermediate chain $U_q$ is collapsed in $G_{\text{Struct}}$ into a single weighted link connecting the corresponding forks. The link weight is defined as $w_q = \sum_{v \in U_q} w_v$, equal to the total node weight along the collapsed chain, and its effective length $\lambda_q = \sum_{l \in U_q} \lambda_l$ represents the total chain length (Supplementary Section~3.2).
+
+\vspace{3mm}
+\textbf{\color{blue} SAIDI in $2$-connected graphs}.\ 
+In Supplementary Section~3.2.1 we show that, for this family of networks,
+
+\begin{equation}
+F = F_{\text{Struct}} + F_{{\text{Inter}}},
+\label{FBreakdown}
+\end{equation}
+
+decomposing SAIDI into contributions from the two structural components of $G$ (Fig.\ \ref{FigOptimization}b,c). The first term on the r.h.s., $F_{\text{Struct}}$, captures the contribution of the structure graph, as computed independently of the collapsed chains. The second term,
+
+\begin{equation}
+F_{{\rm Inter}} = \dfrac{1}{W} \sum_{q = 1}^Q w_q F_{{\rm Inter},q},
+\label{FInter}
+\end{equation}
+
+represents the weighted average contribution of the $Q$ intermediate chains.
+
+Equation \eqref{FBreakdown} constitutes our second key result. It provides a framework for expressing $F$ in terms of our previously analyzed building blocks. The structure graph $G_{\text{Struct}}$ contains only nodes of degree $k \ge 3$, and therefore it can be designed to obey Eq.\ \eqref{F3Regular}. The collapsed intermediate chains are $2$-connected and hence follow Eq.\ \eqref{FRing}. Together, this decomposition enables a systematic derivation of $F$ for a general $2$-connected network by reducing it to its two fundamental structural units:\ forks and intermediate chains.
+
+The crucial point is that the two contributions in \eqref{FBreakdown} scale differently with $p$. The structure graph exhibits $F_{\text{Struct}} \sim p^3$ (Eq.\ \eqref{F3Regular}), whereas Eq.\ \eqref{FRing} predicts $F_{{\rm Inter}} \sim p^2$. Consequently, $F_{{\rm Inter}} \gg F_{\text{Struct}}$, and \eqref{FBreakdown} can be approximated as $F \approx F_{\text{Inter}}$, with the failure risk dominated by the intermediate chains.
+
+To complete the derivation, we use Eq.\ \eqref{FRing} to express the intermediate-chain contribution $F_{{\rm Inter}}$ as (Supplementary Section~3.3)
+
+\begin{equation}
+\label{InterRisk}
+F \approx F_{\text{Inter}} \sim p^2 \av {\tilde \lambda^2},
+\end{equation}
+
+where $\tilde \lambda_q = \lambda_q \sqrt{w_q}$ denotes the effective \textit{link length} associated with the collapsed chain $U_q$, and $\av {\tilde \lambda^2} = (1/Q) \sum_{q = 1}^Q \tilde \lambda_q^2$ is its second moment. Accordingly, the total link length $\lambda_{\rm Net}^2$ appearing in \eqref{FRing} for a single-ring network is replaced in \eqref{InterRisk} by the effective chain length $\tilde \lambda_q^2$, averaged over all intermediate chains.
+
+Next, we express $\av{\tilde \lambda^2}$ in terms of the chain-length variance $\sigma_{\tilde \lambda}^2$, writing $\av{\tilde \lambda^2} = \sigma_{\tilde \lambda}^2 + \av{\tilde \lambda}^2$, and thus bringing $F$ to its final form,
+
+\begin{equation}
+\label{FSigma}
+F \sim
+\left(
+1 + \dfrac{\sigma_{\tilde \lambda}^2}{\av {\tilde \lambda}^2}
+\right) p^2 \av {\tilde \lambda}^2.
+\end{equation}
+
+This expression yields our final insight, identifying the network characteristics that control $F$. Each of the $Q$ intermediate chains is characterized by an effective length $\tilde \lambda_q$, defining a chain-length distribution $P(\tilde \lambda_q)$. From this distribution, network risk is governed by two quantities:\ the mean $\av{\tilde \lambda}$ and the variance $\sigma_{\tilde \lambda}^2$. In what follows, we use these insights to construct minimal-risk networks.
+
+
+\vspace{3mm}
+\textbf{\color{blue} Constructing optimized networks}.
+Equation~\eqref{FSigma} shows that minimizing $F$ requires both short chains (small $\av {\tilde \lambda}$) and low chain-length variance (small $\sigma_{\tilde \lambda}^2$). We therefore, first maximize $G_{\rm Struct}$ to increase the number of forks, leaving fewer nodes per intermediate chain. We then assign the remaining non-fork nodes to chains, aiming to produce a narrow distribution $P(\tilde \lambda)$, thereby minimizing $\sigma_{\tilde \lambda}^2$ and reducing the network risk.
+
+Under a given redundancy $R$, the maximal $G_{\rm Struct}$ contains exactly $2(R - 1) \approx 2R$ fork nodes, each with degree $k = 3$. Nodes with higher degree ($k = 4,5,\dots$) reduce the size of $G_{\rm Struct}$, since the total number of redundant links is fixed. Thus, the most effective use of the $R$ redundant links is to create exclusively degree-three forks. Once the $2R$ fork nodes are selected, the remaining $N - 2R$ nodes are distributed among the $3(R - 1) \approx 3R$ resulting intermediate chains, averaging $(N - 2R)/3R \approx N/3R$ nodes per chain. The challenge is then to find the optimal partition of $G$ into $2R$ forks and $3R$ chains that minimizes both $\av{\tilde \lambda}$ and $\sigma_{\tilde \lambda}^2$.
+
+In Supplementary Section~6, we introduce the Optimal Path Tearing (OPT) algorithm to implement this strategy. Illustrated in Fig.~\ref{FigOptimization}d-f, the algorithm takes as input the spatial configuration of all nodes and the allowed redundancy $R$, and performs a controlled tearing of the network into $3R$ intermediate chains and $2R$ fork nodes, producing the optimal partition that minimizes both average chain length and variance 
+$\bullet$
+\textbf{Step I.\ Intermediate chain-clustering}.\
+First, all nodes are partitioned into $3R$ spatially confined clusters $q$, each of which will form an intermediate chain $U_q$. The clustering is optimized to produce chains with approximately homogeneous $\tilde \lambda_q$ 
+$\bullet$ 
+\textbf{Step II. Structure graph construction}.
+Next, we identify the optimal set of $2R$ fork nodes. Each fork connects three chains, so we select forks located near the circumcenters of neighboring cluster trios. Each fork is then linked to three other forks via its adjacent intermediate chains, forming the network’s structure graph 
+$\bullet$
+\textbf{Step III. Chain construction}.
+After constructing $G_{\rm Struct}$, each link is expanded into a linear chain connecting all nodes within the corresponding cluster. Links in each cluster are arranged to traverse all the cluster nodes with minimal total link length.
+
+The resulting network consists of a highly resilient $2R$-node structure graph, connected by $3R$ chains of roughly uniform length. The resulting network SAIDI closely matches that of the average chain (Eq.~\eqref{InterRisk}), and therefore the chains’ properties effectively determine the overall risk. Each chain, a $2$-connected subgraph of $\sim N/3R$ nodes, follows Eq.~\eqref{FRing}, hence its average risk scales as
+
+\begin{equation}
+\label{FOpt}
+F \sim \frac{p^2 N^2}{R^2}.
+\end{equation}
+
+Thus, under this optimal construction, network risk decays quadratically with link redundancy $R$, reflecting the maximal benefit attainable from each added link.
+
+\vspace{3mm}
+\textbf{\color{blue}Testing the optimized networks}.\
+We evaluate our network optimization for $N = 10^3$ consumer nodes and $R = 10$ excess links, corresponding to a redundancy of $\alpha = 1/3$ in \eqref{Rho}. We begin with a na\"{i}ve deployment, connecting all $N$ nodes via a random spanning tree and then adding the $R$ redundant links to close as many loops as possible (Fig.~\ref{FigOptimization}h,i). This network still contains tree-like subgraphs, which results in a relatively large $F$ due to the abundance of $|X| = 1$ cut-sets.
+
+To mitigate this vulnerability, we eliminate trees by constructing a strictly $2$-connected network (Fig.~\ref{FigOptimization}j). We then introduce $2R$ fork nodes (blue) to deploy the redundancy. At this stage, the chains are not yet optimized for length homogeneity, producing a substantial variance, $\sigma_{\tilde \lambda} = 2.2,7.7$ and $20.3$. While these networks perform better than the na\"{i}ve configuration, they remain sub-optimal due to the chain length heterogeneity. As predicted by our analysis, $F$ increases in networks with greater heterogeneity (Fig.~\ref{FigOptimization}k). 
+
+Finally, in Fig.~\ref{FigOptimization}l,m, we implement the OPT algorithm, following steps (i)–(iii), as illustrated in Fig.\ \ref{FigOptimization}d-f. We designate $2(R - 1) = 18$ fork nodes with degree $k = 3$ (blue) and assign the remaining $982$ nodes to $3(R - 1) = 27$ intermediate chains of (roughly) equal length. This construction achieves a minimized $\sigma_l^2$ of $0.6$ and yields a SAIDI index of $F \approx 2 \times 10^{-4}$,  lower than any of the other equal-redundancy network considered. These results demonstrate that our protocol effectively minimizes the network’s failure risk.
+
+To further evaluate our optimization, we varied $R$ and measured the resulting $F$ as obtained from the OPT algorithm (Fig.~\ref{FigOptimization}n, circles). The observed values closely follow the theoretical prediction of Eq.~\eqref{FOpt} (blue solid line). Remarkably, already at $R \gtrsim 5$, the optimized network achieves a SAIDI comparable to that of the ideal $G_{3\text{Reg}}$ (black solid line). This is despite the fact that $G_{3\text{Reg}}$ employs two orders of magnitude more redundancy.
+
+Hence, our formulation provides a clear recipe to balance cost and risk: given the network size $N$, component durability $p$, and allowed redundancy $R$, it generates the optimal network $G$ that ensures the lowest achievable SAIDI $F$.     
+
+\vspace{3mm}
+\textbf{\color{blue} Optimization boundaries}.
+Our analysis of the NYC network indicates that as $N$ increases, the network crosses the critical point into the $F > p$ regime. Taking $F$ from \eqref{FOpt} and $R$ from \eqref{Rho}, the optimal construction gives $F \sim p^2 N^{2(1 - \alpha)}$. At criticality ($F = p$), this yields
+
+\begin{equation}
+p_c \sim N^{-\beta},
+\label{PcOpt}
+\end{equation}
+
+where $\beta = 2(1 - \alpha)$. In the limit $\alpha = 0$ ($R \sim O(1)$), we recover $\beta = 2$, as observed for the $G_{\text{Ring}}$ configuration (Fig.~\ref{FigNetworks}f). In the opposite limit, $\alpha = 1$ ($R \sim O(N)$), we obtain $\beta = 0$ and $p_c \to 1$ - indeed, consistent with $3$-connected networks. Between these extremes ($0 \le \alpha \le 1$), Eq.~\eqref{PcOpt} delineates how the bounds of the reliability window are set by $N$ and $R$ (or $\alpha$).
+
+This represents our final result, capturing the impact of $N$ on network reliability. Larger networks exhibit a narrower stability window, as $p_c$ decreases with $N$, in effect, quantitatively corroborating the qualitative trends observed in Fig.~\ref{FigNYC}i. Importantly, this window can be widened by controlling the scaling exponent $\beta$ through the optimal deployment of the $N + R$ available links. To examine this, we revisit the NYC network of Fig.~\ref{FigNYC}, constructing its optimal $G$ under redundancy levels $\alpha = 0.3, 0.4,$ and $0.5$. In Fig.~\ref{FigNYCOpt}b,d,f we plot $p_c$ versus $N$ (circles) for all three cases. The data align closely along three distinct slopes, $\beta = 1.4, 1.2,$ and $1$ (solid lines), in excellent agreement with the predictions of Eq.~\eqref{PcOpt}.
+
+These results provide direct guidance for network planning, highlighting the trade-off between component durability $p$ and network reliability $F$. For a fixed $p$, the network must remain within the stability window, $p < p_c$, imposing an upper bound on $\beta$ in \eqref{PcOpt}, which translates to a minimum redundancy, $\alpha = 1 + \ln p / 2\ln N$, in \eqref{Rho}. Conversely, if $R$ is fixed, reflecting a constrained budget, $p$ must satisfy $p < N^{-\beta}$, necessitating investment in component durability, \textit{e.g}., laying wires underground.
+
+\vspace{3mm}
+\textbf{\color{blue} \Large Empirical network optimization}
+ 
+To evaluate our optimization in real-world settings, we collected benchmark infrastructure networks across multiple domains $\bullet$ \textit{Communication}.\ Wavenet, NetworkUSA~\supercite{knight2011internet} $\bullet$ \textit{Water distribution}.\ Balerma, Rural~\supercite{wdsrd,marchi2014,bietal2015,reca2008,zheng2011,bietal2015} $\bullet$ \textit{Power}.\ SFO Pacific, SFO Davidson~\supercite{smartds,elliott2020smartds,smartds_readme} (Fig.~\ref{FigRealNets}). These networks span diverse spatially embedded infrastructures with varying sizes $N$ and redundancy levels $R$.
+
+For each of the six networks, we first measured the initial redundancy $R_0$, cost $C_0$, and SAIDI $F_0$. We then applied our optimization protocol to propose an alternative wiring that enhances reliability at comparable or lower cost. To quantify the improvements, we define
+
+\begin{equation}
+\begin{array}{ccc}
+Z_C = \dfrac{C_0 - C_f}{C_0}, \,\,\, & Z_R = \dfrac{R_0 - R_f}{R_0}, \,\,\, & Z_F = \dfrac{F_0 - F_f}{F_0},
+\end{array}
+\label{ZCZRZF}
+\end{equation}
+
+where $C_f,R_f$ and $F_f$ denote the optimized network parameters. Hence $Z_X \to 1$ represents a $100\%$ improvement in $X$, whereas $Z_X < 0$ indicates degraded performance. 
+
+Our optimization consistently improves network reliability — often dramatically — while preserving or even reducing overall cost. In Wavenet, for example, without adding any redundancy ($Z_R = 0$), the reliability score reaches $Z_F = 0.995$, reflecting a two–orders-of-magnitude boost from $F_0 = 4 \times 10^{-3}$ to $F_f = 2 \times 10^{-5}$. This improvement was achieved solely through better use of the available links. In the Rural water distribution network, we achieve a more modest $Z_F = 0.62$, but this is accompanied by a substantial reduction in redundancy and cost ($Z_R = 0.95$, $Z_C = 0.24$). In the SFO–Davidson power network, a slight increase in cost ($Z_C = -0.09$) delivers a major reliability gain, $Z_F = 0.9$, highlighting the value of optimized wiring even under constrained resources. These and all remaining performance metrics are summarized in Fig.~\ref{FigRealNets}. 
+
+Together, these results demonstrate that our algorithm can substantially enhance infrastructure planning, ensuring robust service continuity under limited resources and practical constraints. A detailed analysis of all networks in Fig.~\ref{FigRealNets} is provided in Supplementary Section~7.3.
+
+
+\textbf{\color{blue} \Large Hierarchial network}
+
+The optimization principle developed above is most direct when the network can be freely rewired in the plane. Real distribution systems, however, are embedded in a far more restrictive geometry. Lines are typically routed along streets, sources are fixed, and many consumers reside in neighborhoods that cannot be incorporated into a compact $2$-connected mesh without adding long and inefficient links. To test this regime, in Fig.~\ref{FigHierarchy} we revisit the SMART-DS P2U distribution network and constrain all candidate links to follow the underlying road network. This produces a qualitatively different design problem:\ the goal is no longer to make the entire system $2$-connected, but to determine where a protected backbone should be placed, and which consumers should remain on short radial attachments.
+
+The original P2U network already contains a nontrivial $2$-connected component, with source-contracted redundancy $R = 171$ and a structure graph of $1426$ nodes. Nevertheless, its reliability is dominated by a large $1$-connected part:\ among its links, $8921$ are bridges, and almost all the SAIDI comes from the first-order term, $F_{O(p)} = 2.26 \times 10^{-3}$ out of a total $F = 2.27 \times 10^{-3}$. Geometrically, this reflects a long effective distance from many consumers to the protected part of the network, especially in the western region where the available street geometry provides little local $2$-connected structure. In the language of our theory, these extended trees have large accumulated $d p$ risk, and therefore a highly redundant core by itself does not guarantee system-level reliability if the periphery remains far from it.
+
+The hierarchical construction resolves this mismatch by combining a road-constrained $2$-connected backbone with short $1$-connected terminal branches. Under nearly the same total length as the original network ($\sim 589\,{\rm km}$), this design reduces the SAIDI to $F = 6.7 \times 10^{-4}$ already with only $R = 50$ backbone redundancies, and to $F \simeq 4.7 \times 10^{-4}$ when the backbone redundancy is increased toward the original value. The decomposition in Fig.~\ref{FigHierarchy} shows why both layers are necessary. Reducing the radial part suppresses the dominant $O(p)$ tree risk, but if the backbone redundancy is too small, as in the $R = 50$ case, the protected component itself develops a sizable $O(p^2)$ contribution from long generalized chains. Increasing $R$ then mainly acts within the backbone, shortening these chains and reducing the second-order risk. Hence, for large spatial infrastructures, the optimal design is not a uniformly meshed network, nor a purely radial one, but a hierarchy:\ a sufficiently redundant backbone placed where geometry supports it, coupled to short radial branches where full $2$-connectivity is geometrically inefficient.
+
+
+
+\vspace{3mm}
+\textbf{\color{blue} \Large Discussion and outlook}
+
+Infrastructure robustness presents a complex multivariate challenge negotiating limited resources, spatial constraints, and reliability benchmarks. Our framework isolates the key parameters governing this trade-off:\ network size $N$; budget, captured via $R$, $\rho$, or $\alpha$; and component durability, quantified by $p$. For any given set of these parameters, our method enables the construction of the optimal network graph and the evaluation of its reliability through Eqs.\ \eqref{FSigma} - \eqref{PcOpt}. This allows us to determine whether the system lies within the desired reliability window, $p \le p_c$, or outside it, in which case no feasible solution exists under the given constraints.
+
+The proposed algorithm is designed to find the exact optimum by minimizing both $\av{\tilde \lambda}$ and $\sigma_{\tilde \lambda}^2$ in \eqref{FSigma}. However, because the space of all possible $P(\tilde \lambda)$ distributions is vast, computing the exact solution is often infeasible. Accordingly, our implementation — whose results appear in Figs.\ \ref{FigOptimization}–\ref{FigRealNets} — relies on approximations. In particular, we employed different proxies for $\tilde \lambda$, such as optimizing for the number of nodes per chain or for the standard chain length $\lambda$ instead of the effective $\tilde \lambda$. A detailed description of our implementation and its limitations is provided in Supplementary Section~6. Importantly, our results show that these approximations have minimal practical impact, achieving near-optimal network configurations. 
+
+Interestingly, the optimal networks we identify are characterized by remarkably homogeneous topologies:\ the degrees of all nodes are confined to $k = 2$ or $3$, and the lengths $\tilde \lambda$ of all chains are designed to be as uniform as possible. This sharply contrasts with canonical results suggesting that network heterogeneity — particularly scale-free degree distributions — yields the most robust topologies against random failures. 
+
+The origin of this apparent discrepancy lies in the value of $p$. Heterogeneous networks are advantageous under large-scale failures, where a substantial fraction of nodes or links fail simultaneously and the network risks fragmentation. In our analysis, by contrast, we focus on the $p \to 0$ limit, where failures are sporadic and scattered, and the primary challenge is minimizing individual node downtime. Thus, the optimal strategy, maximizing heterogeneity or promoting uniformity, depends critically on the type of risk considered:\ either a major, large-scale breakdown, or the inevitable routine failure of individual components (see extended discussion in Supplementary Section 4).
+
+While analytical solutions for complex network optimization are rarely tractable, algorithmic approaches remain challenging due to the combinatorial and highly constrained nature of the problem. Yet, as cities expand and our dependence on power, communication, and other technological infrastructures deepens, the design of scalable and reliable networks is emerging as a central bottleneck to growth and development~\cite{lei2025privacy}. The approach presented here — algorithmic optimization guided by network-physics principles — offers a general and practical framework for improving the robustness and efficiency of such systems.  
+
+\clearpage
+
+\begin{figure}
+\begin{centering}
+\includegraphics[width=0.87\linewidth]{Figures/NYC.pdf}
+\par\end{centering}
+\vspace{-4mm}
+\caption{\footnotesize \textbf{\color{blue} Power network layout in New-York City (NYC)}.\ 
+\textbf{a} We used a minimum spanning tree to layout an optimally efficient network, supplying power to $N = 600$ nodes from a single source $s$ (red dot). Normalizing all link lengths to $\av \lambda  = 1$, and setting the cost per unit length to $c = 1$, the total network cost is $C = 600$.\ 
+\textbf{b} The fraction of disconnected nodes $F$ vs.\ time, as obtained from numerical simulations under three values of component risk $p$ (solid lines). The average value of $F$ is also shown (dashed lines). For example, setting $p = 10^{-4}$, a low risk scenario (light red) we have $F \to 2.5 \times 10^{-2}$.
+\textbf{c} $F$ vs.\ $p$ for the NYC network in \textbf{a} (blue solid line). The network risk rises sharply as $p$ increases. The $F = p$ line (dashed) represents the case where the \textit{network} is as risky as its individual \textit{components}. The minimal-cost network in \textbf{a} is found to be consistently above this line.
+\textbf{d} We redesigned the NYC network to be $2$-connected, such than no single link failure can lead to service loss. This was achieved by adding just $R = 1$ redundant links.
+\textbf{e} $F$ vs.\ $t$ (solid lines) and the average SAIDI (dashed) for the $2$-connected configuration. 
+\textbf{f} $F$ vs.\ $p$ is now of quadratic form (blue solid line). For small $p$, $F$ resides below the $F = p$ line (inset). However, as $p$ increases, we observe a critical $p_c$ (yellow dot) above which the network enters the $F > p$ regime. The $p \le p_c$ region captures the network's \textit{reliability window}. 
+\textbf{g} To enhance reliability we added a set of $R > 1$ redundant links, showing $F$ vs.\ $p$ for $R = 7$ and $10$ (blue solid lines). The increased redundancy expands the reliability window, but still has $F > p$ for $p > p_c$ (yellow dashed lines). 
+\textbf{h} $F$ vs.\ $R$ (blue) under $p = 5 \times 10^{-3}$. We observe a critical redundancy $R_c$ above which $F$ dips below $p$ (red dashed line). For $R < R_c$ the network remains in the $F > p$ regime.
+\textbf{i} We gradually increased the number of nodes $N$, adding sources accordingly, and measured $F$ vs.\ $N$. We find that network size plays a destabilizing role. 
+The three factors controlling $F$:\ 
+\textbf{j} Component risk $p$ describes the reliability of the links themselves, affected \textit{e.g}., by underground (left) vs. above ground (right) layout; $F$ increased with $p$. 
+\textbf{k} Redundancy $R$ describes the available budget for link enrichment (yellow); $F$ decreases with $R$. 
+\textbf{l} Scale $N$ denotes the number of consumers; $F$ increases with $N$.
+}
+\label{FigNYC}
+\end{figure}
+
+\clearpage
+
+\begin{figure}
+\begin{centering}
+\includegraphics[width=0.7\linewidth]{Figures/Decomposition.pdf}
+\par\end{centering}
+\vspace{0mm}
+\caption{\footnotesize \textbf{\color{blue} Decomposing $F$ into its network and component driven risks}.\ 
+\textbf{a} Single-source network ($S$, yellow) with one disconnected link ($l = 1$, red cut). Despite the link failure, all nodes remain connected to the source via alternative pathways (yellow dashed paths); thus, $l = 1$ does \textit{not} constitute a cut-set.\
+\textbf{b} A simultaneous failure of the link set $X = \{1,2\}$ disconnects a total of $7$ nodes ($\overline{G}_S(X)$, red shaded). The set $X$ is therefore a cut-set of size $2$, with weight $w_X$ equal to the total weight of all seven disconnected nodes in $\overline{G}_S(X)$.\
+\textbf{c} Summing over the contributions of all cut-sets with sizes $m = 1,\dots,L$, we arrive at the overall network risk $F$. 
+The coefficients $Z_m$ depend on the network structure in \textbf{e} (blue), while the powers $p^m$ and $(1 - p)^{L - m}$ capture the contribution of the component risk, illustrated in \textbf{d} (orange). Hence, to minimize $F$ we can either invest resources in the network layout — namely, add redundancy $R$ — or enhance component durability, \textit{e.g.}, by laying links underground. Here, we take $p$ as given and focus on minimizing $Z_m$ by optimizing the network structure and layout.
+\textbf{f} Components of $Z_m$:\ The coefficient $Z_m$ is driven by (i) the number of $m$-sized cut-sets, $|\X_m|$, which sets the number of terms in the summation; (ii) the link lengths within these cut-sets, encapsulated in $\gamma_X$; and (iii) the total weight of their disconnected components, $w_X$. 
+\textbf{g - i} For example, in $Z_2$ we count $|\X_m| = 3$ distinct $2$-link cut-sets, $X_1$, $X_2$, and $X_3$. For each cut-set we  mark its disconnected component (red), and explicitly calculate its $\gamma_X$ and $w_X$. For instance, $X_1$ represents the simultaneous failure of links $1$ and $2$ thus $\gamma_{X_1} = \lambda_1 \lambda _2$. This cut-set results in service denial to nodes $a,b,c,d$, leading to a total disconnected weight of $w_{X_1} = w_a + w_b + w_c + w_d$. 
+}
+\label{FigCutSets}
+\end{figure}
+
+\clearpage
+
+\begin{figure}
+\begin{centering}
+\includegraphics[width=0.95\linewidth]{Figures/Topologies.pdf}
+\par\end{centering}
+\vspace{-4mm}
+\caption{\footnotesize \textbf{\color{blue} Taxonomy of network archetypes}.\
+\textbf{a} Zero-redundancy networks $G_{\text{Tree}}$ have exactly $L = N - 1$ links and $R = 0$. Such networks are tree-like and therefore lack loops.\
+\textbf{b} We generated $100$ zero-redundancy networks of varying size and structure, and assigned their component risk uniformly at random in the range $0 \le p \le 10^{-2}$. For each network we measured $F$ numerically and display $F$ versus $p$. For three representative networks we show the network structure explicitly. We find that almost $100\%$ of the time the risk reside above the $F = p$ line (dashed). Hence, the $G_{\text{Tree}}$ family is inherently unstable.\
+\textbf{c} Observed SAIDI $F$ versus the theoretically predicted $F_{\text{Theory}}$, as obtained from Eq.\ \eqref{FTree}. The scatter observed in panel \textbf{b} collapses tightly around the $x = y$ line (dashed), corroborating the theoretical prediction.\
+\textbf{d} $2$-connected networks are designed to have no cut-sets smaller than $m = 2$. These networks require a marginal redundancy of $R \sim O(1)$, with the most extreme case represented by the ring network $G_{\text{Ring}}$, achieved with $R = 1$.\
+\textbf{e} $F$ versus $p$ as obtained for rings of varying size $N$ (green shades). $G_{\text{Ring}}$ exhibits a window of reliability, but at $p = p_c$ (yellow dot) it crosses the $F = p$ line (grey dashed) and enters the unreliable regime. The width of the reliability window narrows as $N$ increases.\
+\textbf{f} The critical component risk $p_c$ versus $N$, as obtained from numerical simulations of $G_{\text{Ring}}$ (circles). The theoretical prediction of \eqref{FOpt} is also shown (solid line).\
+\textbf{g} We consider the $3$-regular family of networks $G_{\text{3Reg}}$. This network family is practically is risk-free, featuring $F \sim p^3 \to 0$. This robustness, however, comes at a cost of $R \sim O(N)$.\
+\textbf{h} We revisit the NYC network, this time generating $3$-regular network layouts. As predicted by \eqref{F3Regular}, $F$ is now independent of $N$ (blue), as hence in $G_{\text{3Reg}}$ network size no longer plays a destabilizing role. The component risk $p$ is shown in red.\
+\textbf{i} $F$ versus $p$ for $3$-regular networks of varying size $N$ (blue shades). We observe $F$ consistently below the $F = p$ threshold.
+}
+\label{FigNetworks}
+\end{figure}
+
+\clearpage
+
+\begin{figure}
+\begin{centering}
+\vspace{-3mm}
+\includegraphics[width=0.47\linewidth]{Figures/OptimizartionAlgo.pdf}
+\par\end{centering}
+\vspace{-4mm}
+\caption{\footnotesize \textbf{\color{blue} Network optimization – step by step} 
+(Full size image appears in page 19).\
+\textbf{a} We identify three types of network components:\ Forks – nodes with degree $k \ge 3$ (blue); Chains $U_q$ – sequences of nodes with $k = 2$ that link two fork nodes (green); Trees – radial motifs that lack loops (red). Trees introduce risk due to their single-link cut-sets ($Z_1 > 0$ in \eqref{Zm}). We therefore eliminate all trees in our optimized networks.\
+\textbf{b} After eliminating all trees, the resulting $2$-connected graph is collapsed into $G_{\text{Struct}}$, in which all intermediate chains are reduced to single links. The effective length of these links, $\tilde \lambda_q$, captures the internal structure of the corresponding chain $U_q$, as described in Eq.\ \eqref{InterRisk}.\
+\textbf{c} The intermediate chains appear in $G_{\text{Inter}}$. The resulting SAIDI $F$ can now be decomposed into $F_{\text{Struct}}$, obtained from $G_{\text{Struct}}$, and $F_{\text{Inter}} \gg F_{\text{Struct}}$, which captures the risks arising from all intermediate chains. Our optimization seeks the best selection of forks and the optimal partition into intermediate chains to minimize $F_{\text{Inter}}$.\
+\textbf{d} Step I.\ Clustering.\ Partition the network into clusters $U_q$ (green shaded), that will later form the intermediate chains. We aim for a partition that groups together roughly equal node sets located within confined spatial regions. This helps construct chains with homogeneous $\tilde \lambda_q$.\
+\textbf{e} Step II.\ Structure graph.\ Select the optimal set of $2R$ forks (blue nodes). Each fork links three chains, so we choose forks proximal to the circumcenters of chain trios. To construct the $3$-regular $G_{\text{Struct}}$, we link all forks through their adjacent chain clusters (grey links) .\
+\textbf{f} Step III.\ Inter-chains.\ Expand the links of $G_{\text{Struct}}$ to traverse all nodes within each intermediate chain cluster at minimal wiring cost. The resulting optimized network includes $2R$ fork nodes with degree $k = 3$ (blue, large), and $3R$ intermediate chains that link parsimoniously between them.\
+\textbf{g} We constructed a spatially embedded network with $N = 10^3$ nodes, redundancy $R = 10$ ($\alpha = 1/3$), and component risk $p = 5 \times 10^{-4}$. 
+\textbf{h} In the Na"{i}ve construction we generate a minimum spanning tree (red) and assign the $R$ excess links (blue) to close as many loops as possible. 
+\textbf{i} The resulting risk is $F \approx  2\times 10^{-3}$, significantly greater than $p$.\
+\textbf{j} Using our algorithm, we construct $2$-connected networks of forks (blue) and intermediate chains (green), eliminating all trees. The network risk $F$ is dramatically reduced. However, these graphs still exhibit significant variance $\sigma_{\tilde \lambda}$ and are therefore sub-optimal. 
+\textbf{k} As predicted in \eqref{FSigma}, higher $\sigma_{\tilde \lambda}$ leads to larger $F$.\
+\textbf{l} Using our three-step algorithm, we construct the optimal network in which $\sigma_{\tilde \lambda}$ is minimized ($0.6$). The resulting SAIDI is $F = 2 \times 10^{-4}$, significantly below the component risk $p$me.
+\textbf{m} The structure graph of the optimized network.
+\textbf{n} The optimal $F_{\rm Opt}$, as obtained from our algorithm, versus $R$ (circles). The theoretical prediction of Eq.\ \eqref{FOpt} is also shown (blue solid line). Already at $R \gtrsim 5$, a small redundancy of $\rho \lesssim 1\%$, $F$ approaches the ideal $F_{3\text{Reg}}$ (black solid line).
+}
+\label{FigOptimization}
+\end{figure}
+
+\clearpage
+
+\begin{figure}
+\begin{centering}
+\includegraphics[width=0.9\linewidth]{Figures/NYCOptimization.pdf}
+\par\end{centering}
+\vspace{-5mm}
+\caption{\footnotesize \textbf{\color{blue} Cost-effective optimization of the NYC network}.\
+\textbf{a}-\textbf{c} We apply our algorithm to construct optimized power networks for the NYC spatial node layout under three levels of redundancy:\ $\alpha = 0.3, 0.4$ and $0.5$ in \eqref{Rho}. For each network we show the resulting SAIDI $F$, ranging from $2 \times 10^{-3}$ for the smallest redundancy, to $6 \times 10^{-5}$ for the most high-cost construction.\
+\textbf{d} The critical component risk $p_c$ vs.\ $N$ as obtained from the NYC network with $\alpha = 0.3$ (circles). The numerical results closely follow the theoretical scaling of Eq.\ \eqref{PcOpt} with $\beta = 1.4$, as predicted (solid line).\
+\textbf{e}-\textbf{f} Corresponding results for $\alpha = 0.4$ ($\beta = 1.2$) and $0.5$ ($\beta = 1$).
+}
+\label{FigNYCOpt}
+\end{figure}
+
+\clearpage
+
+\begin{figure}
+\begin{centering}
+\includegraphics[width=0.92\linewidth]{Figures/RealData.pdf}
+\par\end{centering}
+\vspace{-2mm}
+\caption{\footnotesize \textbf{\color{blue} Optimizing real-world infrastructure networks}.\
+\textbf{a} The Wavenet communication network, with $N = 91$ nodes and $R = 3$ redundant links (blue).
+\textbf{b} The network after optimization using our algorithm.
+\textbf{c} Optimization scores $Z_C$, $Z_R$, and $Z_F$ from Eq.\ \eqref{ZCZRZF}. Reliability improves significantly ($Z_F = 0.995$) while maintaining the same redundancy ($Z_R = 0$), and a marginal inclrease in cost ($Z_C = -0.03$).
+\textbf{d}-\textbf{f} NetworkUSA:\ optimization reduces network risk ($Z_F = 0.71$) while requiring fewer redundant links and reduced cost ($Z_R = 0.50. Z_C = 0.12$).
+\textbf{g}-\textbf{l} Similar results for the Balerma and Rural water networks.
+\textbf{m}-\textbf{r} Optimization of the SFO Pacific and SFO Davidson power networks.
+}
+\label{FigRealNets}
+\end{figure}
+
+\clearpage
+
+\begin{figure}
+\begin{centering}
+\vspace{-3mm}
+\includegraphics[width=0.77\linewidth]{Figures/OptimizartionAlgo.pdf}
+\par\end{centering}
+\begin{center}
+\footnotesize \textbf{\color{blue} Figure 4.\ Network optimization – step by step - Full size image.}
+\end{center}
+\end{figure}
+
+\clearpage
+
+\printbibliography[heading=subbibliography,title={References}]
+\end{refsection}
+
+\clearpage
+
+
+% \bibliographystyle{plain}
+% \bibliography{bib}
+
+
+\end{document}
+

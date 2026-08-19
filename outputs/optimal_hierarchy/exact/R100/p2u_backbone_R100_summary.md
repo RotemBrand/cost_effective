@@ -1,0 +1,24 @@
+# P2U ILP 2-Edge Solution
+
+- Status: `OPTIMAL`
+- Stop reason: `2edge_connected`
+- Runtime: `337.42` s
+- Cut rounds: `134`
+- Added cuts: `8962`
+- Input nodes/edges: `5296` / `16985`
+- Solution nodes/edges: `5296` / `5395`
+- Solution cycle rank: `100`
+- Solution connected: `True`
+- Solution bridge count: `0`
+- Solution is 2-edge-connected: `True`
+- Source incident constraints: `15`
+- Original sources with candidate edges: `15`
+- Selected original sources with incident edge: `15`
+- Objective length: `399755.967` m
+- Best bound: `395530.700`
+- MIP gap: `0.01056961505133074`
+- Redundancy constraint: `100`
+- Max redundancy constraint: `None`
+- Cut mode: `callback`
+- Threads: `0`
+- Requested MIPGap: `0.05`

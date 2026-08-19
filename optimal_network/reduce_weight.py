@@ -20,6 +20,7 @@ def optimize_rel_weight_ratio(optimal_graph: nx.Graph, max_risk_gain: float=0.5,
 
 
         # make change
+        removed_attrs = dict(new_graph.edges[optimal_row['fork_neigh'], optimal_row['fork']])
         new_graph.add_edge(optimal_row['fork_neigh'], optimal_row['new_fork'])
         new_graph.remove_edge(optimal_row['fork_neigh'], optimal_row['fork'])
         
@@ -31,7 +32,7 @@ def optimize_rel_weight_ratio(optimal_graph: nx.Graph, max_risk_gain: float=0.5,
             print(f"{it}: {weight_gain=:.3f}, {risk_gain=:.3f}")
         if risk_gain > max_risk_gain:
             new_graph.remove_edge(optimal_row['fork_neigh'], optimal_row['new_fork'])
-            new_graph.add_edge(optimal_row['fork_neigh'], optimal_row['fork'])
+            new_graph.add_edge(optimal_row['fork_neigh'], optimal_row['fork'], **removed_attrs)
             break
 
     new_weight = _total_weight(new_graph)
@@ -44,7 +45,9 @@ def optimize_rel_weight_ratio(optimal_graph: nx.Graph, max_risk_gain: float=0.5,
 
 def _get_all_changes(optimal_graph: nx.Graph, original_risk: float, max_risk_gain: float, source=None) -> list:
     def get_weight(node1, node2) -> float:
-        return np.linalg.norm(optimal_graph.nodes[node1]["pos"] - optimal_graph.nodes[node2]["pos"])
+        pos1 = np.asarray(optimal_graph.nodes[node1]["pos"], dtype=float)
+        pos2 = np.asarray(optimal_graph.nodes[node2]["pos"], dtype=float)
+        return np.linalg.norm(pos1 - pos2)
     # optimal graph stats
     total_weight = _total_weight(optimal_graph)
     inter_risk = _total_inter_risk(optimal_graph)
@@ -61,6 +64,8 @@ def _get_all_changes(optimal_graph: nx.Graph, original_risk: float, max_risk_gai
             chain1_len = c_data1["len"]
             chain2_len = c_data2["len"]
             for new_fork_idx, new_fork in enumerate(c_data2["nodes_order"]):
+                if new_fork in {fork, fork_neigh} or optimal_graph.has_edge(fork_neigh, new_fork):
+                    continue
                 weight_gain = (get_weight(fork_neigh, new_fork) - get_weight(fork_neigh, fork)) / total_weight
                 if weight_gain >= 0:
                     continue
@@ -110,7 +115,7 @@ def _inter_risk(l: int) -> float:
 def _total_weight(G: nx.Graph) -> float:
     pos = nx.get_node_attributes(G, "pos")
     return sum([
-        np.linalg.norm(pos[v] - pos[u])
+        np.linalg.norm(np.asarray(pos[v], dtype=float) - np.asarray(pos[u], dtype=float))
         for v, u in G.edges
     ])
 

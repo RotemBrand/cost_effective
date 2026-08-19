@@ -20,6 +20,7 @@ def get_optimal_strc_trips(
         exact_vertices: bool,
         debug: bool,
         source_node: int,
+        max_trip_vertices_per_center: int | None = None,
     ) -> List[Trip]:
     """Compute a minimal cubic, 3-edge-connected structure expressed as trips.
 
@@ -84,7 +85,8 @@ def get_optimal_strc_trips(
         points,
         min_n_vertices=n_nodes,
         max_n_vertices=max_n_vertices,
-        source_node=source_node
+        source_node=source_node,
+        max_trip_vertices_per_center=max_trip_vertices_per_center,
     )
     # use the trips to construct a 3 connected structure that pass all the chains
     toc("build_voronoi_trip_graph", debug)
@@ -102,7 +104,13 @@ def get_optimal_strc_trips(
 ##### build strc #######
 
 def _build_voronoi_trip_graph(
-        centers: np.array, points: np.array, min_n_vertices: int, source_node: int, max_n_vertices: int=None, seed: int=42
+        centers: np.array,
+        points: np.array,
+        min_n_vertices: int,
+        source_node: int,
+        max_n_vertices: int=None,
+        seed: int=42,
+        max_trip_vertices_per_center: int | None = None,
     ) -> nx.MultiGraph:
     # calculate Voronoi cells
     vor = Voronoi(centers)
@@ -142,15 +150,30 @@ def _build_voronoi_trip_graph(
     chosen_points = points[chosen_points_id]
 
 
-    # make a graph of all v1 -> c -> v2 trips
     trips_graph = nx.MultiGraph()
+    for i, pos in enumerate(chosen_points):
+        trips_graph.add_node(i, pos=pos, point_idx=chosen_points_id[i])
+
+    if max_trip_vertices_per_center is not None:
+        if max_trip_vertices_per_center < 2:
+            raise ValueError("max_trip_vertices_per_center must be at least 2")
+        k = min(max_trip_vertices_per_center, len(chosen_points))
+        tree = cKDTree(chosen_points)
+        for ck, c in centers_dict.items():
+            _, nearest = tree.query(c, k=k)
+            nearest = np.atleast_1d(nearest).astype(int).tolist()
+            for i, j in combinations(nearest, 2):
+                pos_i, pos_j = chosen_points[i], chosen_points[j]
+                weight = np.linalg.norm(pos_i - c) + np.linalg.norm(pos_j - c)
+                trips_graph.add_edge(i, j, ck, cpos=c, weight=weight)
+        return trips_graph
+
+    # make a graph of all v1 -> c -> v2 trips
     for (i, j) in combinations(list(range(len(chosen_points_id))), 2):
-        pos_i, pos_j = chosen_points[i], chosen_points[j]  
+        pos_i, pos_j = chosen_points[i], chosen_points[j]
         for ck, c in centers_dict.items():
             weight = np.linalg.norm(pos_i - c) + np.linalg.norm(pos_j - c)
             trips_graph.add_edge(i, j, ck, cpos=c, weight=weight)
-        trips_graph.nodes[i].update(pos=pos_i, point_idx=chosen_points_id[i])
-        trips_graph.nodes[j].update(pos=pos_j, point_idx=chosen_points_id[j])
     return trips_graph
     
 

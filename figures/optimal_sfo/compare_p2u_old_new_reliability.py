@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import sys
 import time
 from pathlib import Path
@@ -150,6 +151,16 @@ def _topology_dict(
     total_edge_weight = sum(float(data.get("edge_weight", 0.0)) for _, _, data in graph.edges(data=True))
     tie_count = sum(1 for _, _, data in graph.edges(data=True) if data.get("is_tie", False))
     switch_count = sum(1 for _, _, data in graph.edges(data=True) if data.get("is_switch", False))
+    regular_stats = _chain_length_stats(
+        decomp.regular_chains,
+        total_weight=decomp.total_weight,
+        prefix="regular",
+    )
+    generalized_stats = _chain_length_stats(
+        decomp.generalized_chains,
+        total_weight=decomp.total_weight,
+        prefix="generalized",
+    )
     return {
         "raw_nodes": int(graph.number_of_nodes()),
         "raw_edges": int(graph.number_of_edges()),
@@ -179,10 +190,65 @@ def _topology_dict(
         "regular_chains": int(len(decomp.regular_chains)),
         "regular_chain_total_length": float(sum(chain.length for chain in decomp.regular_chains)),
         "regular_chain_total_weight": float(sum(chain.total_weight for chain in decomp.regular_chains)),
+        **regular_stats,
         "three_edge_macro_nodes": int(decomp.three_edge_macro_graph.number_of_nodes()),
         "three_edge_macro_edges": int(decomp.three_edge_macro_graph.number_of_edges()),
         "generalized_chains": int(len(decomp.generalized_chains)),
+        **generalized_stats,
         **extra,
+    }
+
+
+def _chain_length_stats(chains, *, total_weight: float, prefix: str) -> dict[str, float | int | None]:
+    chain_list = list(chains)
+    lengths = [float(chain.length) for chain in chain_list]
+    loads = [float(chain.total_weight) for chain in chain_list]
+    q = len(chain_list)
+    if q == 0:
+        return {
+            f"{prefix}_chain_mean_length_m": None,
+            f"{prefix}_chain_std_over_mean_length": None,
+            f"{prefix}_chain_max_length_m": None,
+            f"{prefix}_chain_mean_effective_lambda_m": None,
+            f"{prefix}_chain_std_over_mean_effective_lambda": None,
+            f"{prefix}_chain_max_effective_lambda_m": None,
+            f"{prefix}_chain_effective_lambda_second_moment_m2": None,
+            f"{prefix}_chain_total_weight": 0.0,
+            f"{prefix}_chain_positive_weight_count": 0,
+        }
+
+    def mean(values: list[float]) -> float:
+        return float(sum(values) / len(values))
+
+    def rel_std(values: list[float]) -> float | None:
+        avg = mean(values)
+        if avg == 0.0:
+            return None
+        var = sum((value - avg) ** 2 for value in values) / len(values)
+        return float(math.sqrt(var) / avg)
+
+    length_mean = mean(lengths)
+    if total_weight > 0:
+        # Normalization makes <tilde_lambda^2> = (1/W) sum_q lambda_q^2 w_q,
+        # matching the weighted internal-risk coefficient in the paper.
+        effective = [
+            length * math.sqrt(q * max(load, 0.0) / total_weight)
+            for length, load in zip(lengths, loads, strict=True)
+        ]
+    else:
+        effective = [0.0 for _ in lengths]
+    effective_mean = mean(effective)
+    effective_second_moment = mean([value * value for value in effective])
+    return {
+        f"{prefix}_chain_mean_length_m": float(length_mean),
+        f"{prefix}_chain_std_over_mean_length": rel_std(lengths),
+        f"{prefix}_chain_max_length_m": float(max(lengths)),
+        f"{prefix}_chain_mean_effective_lambda_m": float(effective_mean),
+        f"{prefix}_chain_std_over_mean_effective_lambda": rel_std(effective),
+        f"{prefix}_chain_max_effective_lambda_m": float(max(effective)),
+        f"{prefix}_chain_effective_lambda_second_moment_m2": float(effective_second_moment),
+        f"{prefix}_chain_total_weight": float(sum(loads)),
+        f"{prefix}_chain_positive_weight_count": int(sum(1 for load in loads if load > 0.0)),
     }
 
 
@@ -348,6 +414,13 @@ def _markdown(comparison: dict) -> str:
         ("Structure graph nodes", ["topology", "structure_graph_nodes"]),
         ("Structure graph edges", ["topology", "structure_graph_edges"]),
         ("Regular chains", ["topology", "regular_chains"]),
+        ("Generalized chains", ["topology", "generalized_chains"]),
+        ("Gen. <lambda_tilde> km", ["topology", "generalized_chain_mean_effective_lambda_m"], 1000.0),
+        ("Gen. sigma/<lambda_tilde>", ["topology", "generalized_chain_std_over_mean_effective_lambda"]),
+        ("Gen. max lambda_tilde km", ["topology", "generalized_chain_max_effective_lambda_m"], 1000.0),
+        ("Gen. <lambda> km", ["topology", "generalized_chain_mean_length_m"], 1000.0),
+        ("Gen. sigma/<lambda>", ["topology", "generalized_chain_std_over_mean_length"]),
+        ("Gen. max lambda km", ["topology", "generalized_chain_max_length_m"], 1000.0),
         ("Float total risk", ["risk_float", "total"]),
         ("Float tree risk", ["risk_float", "tree"]),
         ("Float nonbridge section risk", ["risk_float", "nonbridge_section"]),
