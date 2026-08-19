@@ -1,0 +1,32 @@
+{
+  "algorithm": "OPT_equal_chain_backbone",
+  "output_gpkg": "C:\\Users\\rotem\\Desktop\\\u05de\u05e1\u05de\u05db\u05d9\u05dd\\\u05ea\u05d5\u05d0\u05e8\\\u05ea\u05d6\u05d4\\\u05e1\u05d9\u05de\u05d5\u05dc\u05e6\u05d9\u05d5\u05ea\\cost_effective\\outputs\\optimal_hierarchy\\opt\\try_001_opt_equal_chain\\R050\\p2u_opt_backbone_R50_3857.gpkg",
+  "redundancy_constraint": 50,
+  "max_redundancy_constraint": null,
+  "status_name": "OPT_CONSTRUCTED",
+  "stop_reason": "opt_algorithm_completed",
+  "runtime_s": 56.02468799997587,
+  "seed": 20260812,
+  "kmeans_max_iter": 3,
+  "strc_n_init_iters": 1,
+  "strc_exact_vertices": true,
+  "strc_trip_nearest_vertices": 24,
+  "chain_n_init_iters": 1,
+  "local_fix": {
+    "enabled": false
+  },
+  "input_nodes": 5310,
+  "solution_nodes": 5310,
+  "solution_edges": 5359,
+  "solution_cycle_rank": 50,
+  "solution_connected": true,
+  "solution_bridge_count": 0,
+  "solution_is_2edge_connected": true,
+  "solution_transformer_nodes": 5295,
+  "solution_source_nodes": 11,
+  "objective_length_m": 562812.2363966871,
+  "mean_edge_length_m": 105.02187654351317,
+  "max_edge_length_m": 2131.4006322548075,
+  "tie_edges": 50,
+  "tree_mode": "street_forest"
+}
