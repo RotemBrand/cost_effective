@@ -55,6 +55,8 @@ class OptParameters:
 
 
 def try_dir(try_name: str) -> Path:
+    if try_name in {"", ".", "opt"}:
+        return OUTPUT_DIR
     return OUTPUT_DIR / try_name
 
 
@@ -446,7 +448,11 @@ def _markdown_table(df: pd.DataFrame) -> str:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run P2U hierarchy cases with an OPT Euclidean backbone.")
     parser.add_argument("--corridor-gpkg", type=Path, default=CORRIDOR_GPKG)
-    parser.add_argument("--try-name", default="try_001_opt_equal_chain")
+    parser.add_argument(
+        "--try-name",
+        default="opt",
+        help="Output subfolder under outputs/optimal_hierarchy/opt. Use 'opt' for the method folder itself.",
+    )
     parser.add_argument("--r-values", type=int, nargs="+", default=[50])
     parser.add_argument("--reuse-existing", action="store_true")
     parser.add_argument("--seed", type=int, default=20260812)
