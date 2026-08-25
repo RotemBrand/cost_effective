@@ -27,6 +27,8 @@ from figures.p2u_full_mv_reliability import (  # noqa: E402
     build_full_mv_graph,
 )
 from indexes import GraphRel  # noqa: E402
+from indexes import probs as PROBS  # noqa: E402
+from indexes.utilities import edge_probs_by_length  # noqa: E402
 
 
 OUTPUT_JSON = OUTPUT_DIR / "p2u_old_new_reliability_comparison.json"
@@ -261,6 +263,7 @@ def _analyze_one(
     p_mean: float,
     generalized: bool,
     generalized_method: str,
+    edge_failure_rate_per_length: float | None = None,
 ) -> dict:
     t0 = time.perf_counter()
     graph_rel = _graph_rel(graph, sources)
@@ -270,18 +273,47 @@ def _analyze_one(
     )
     decompose_runtime = time.perf_counter() - t0
 
+    reliability_mode = "network_mean_edge_probability"
+    edge_probability_kwargs: dict[str, Any] = {
+        "mean_edge_failure_prob": p_mean,
+        "length_attr": "length",
+    }
+    poly_probability_kwargs: dict[str, Any] = dict(edge_probability_kwargs)
+    actual_failure_rate = None
+    if edge_failure_rate_per_length is not None:
+        reliability_mode = "fixed_original_length_failure_rate"
+        edge_probs, actual_failure_rate = edge_probs_by_length(
+            decomp.source_graph,
+            p=float(edge_failure_rate_per_length),
+            mode="rate",
+            length_attr="length",
+        )
+        edge_probability_kwargs = {"edge_probs": edge_probs}
+        if p_mean == 0:
+            poly_edge_probs = {edge: PROBS.Poly([0.0]) for edge in edge_probs}
+        else:
+            poly_edge_probs = {
+                edge: PROBS.Poly([0.0, float(prob) / float(p_mean)])
+                for edge, prob in edge_probs.items()
+            }
+        poly_probability_kwargs = {"edge_probs": poly_edge_probs}
+
     float_terms = decomp.switch_risk_terms(
-        mean_edge_failure_prob=p_mean,
-        length_attr="length",
         output="float",
+        **edge_probability_kwargs,
     )
     poly_terms = decomp.switch_risk_terms(
-        mean_edge_failure_prob=p_mean,
-        length_attr="length",
         output="poly",
+        **poly_probability_kwargs,
     )
     return {
         "name": name,
+        "reliability_probability_mode": reliability_mode,
+        "edge_probability_graph": "source_graph",
+        "edge_failure_rate_per_length": (
+            None if actual_failure_rate is None else float(actual_failure_rate)
+        ),
+        "reference_p_mean": float(p_mean),
         "generalized_structural_requested": bool(generalized),
         "generalized_component_method": generalized_method if generalized else None,
         "decomposition_runtime_seconds": float(decompose_runtime),

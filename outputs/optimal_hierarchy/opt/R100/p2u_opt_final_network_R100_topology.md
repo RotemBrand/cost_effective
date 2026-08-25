@@ -4,11 +4,11 @@ The analyzed graph is a switch-section graph. Transformer chains are represented
 
 ## Topology
 
-- Final graph nodes/edges: `11744` / `11779`
-- Source-contracted nodes/edges: `11730` / `11779`
-- Source-contracted cycle rank R: `50`
+- Final graph nodes/edges: `11744` / `11829`
+- Source-contracted nodes/edges: `11730` / `11829`
+- Source-contracted cycle rank R: `100`
 - Source-contracted bridge edges: `2215`
-- Backbone edges: `9564`
+- Backbone edges: `9614`
 - Tree attachment edges: `2215`
 - Sources: `15`
 
@@ -26,16 +26,16 @@ The analyzed graph is a switch-section graph. Transformer chains are represented
 
 ## Length
 
-- Backbone length: `522418.692` m
+- Backbone length: `575455.883` m
 - Tree physical road-union length: `102055.759` m
-- Total physical length: `624474.451` m
+- Total physical length: `677511.641` m
 - Terminal attachment distance sum: `102055.759` m
 - Mean/max terminal distance to backbone: `46.075` m / `816.951` m
 
 ## Failure Probabilities
 
 - Target mean edge probability: `0.0005`
-- Fitted failure rate per meter: `9.4311304e-06`
+- Fitted failure rate per meter: `8.7297393e-06`
 
 ## Reliability
 
