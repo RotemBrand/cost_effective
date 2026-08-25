@@ -4,38 +4,38 @@ The analyzed graph is a switch-section graph. Transformer chains are represented
 
 ## Topology
 
-- Final graph nodes/edges: `10516` / `10551`
-- Source-contracted nodes/edges: `10502` / `10551`
+- Final graph nodes/edges: `8931` / `8966`
+- Source-contracted nodes/edges: `8917` / `8966`
 - Source-contracted cycle rank R: `50`
-- Source-contracted bridge edges: `5206`
+- Source-contracted bridge edges: `3621`
 - Backbone edges: `5345`
-- Tree attachment edges: `5206`
+- Tree attachment edges: `3621`
 - Sources: `15`
 
 ## Transformers And Load
 
 - Represented transformers: `12373` / `12373`
-- Node transformers: `10960`
-- Contracted edge-load transformers: `1413`
-- Transformers on backbone, including edge load: `7028`
-- Tree transformers: `5345`
-- Percent transformers on backbone: `56.801%`
-- Capacity on backbone: `651470.0` kVA / `1100120.0` kVA
-- Demand on backbone: `427891.290` kW / `661466.740` kW
-- Percent demand on backbone: `64.688%`
+- Node transformers: `9300`
+- Contracted edge-load transformers: `3073`
+- Transformers on backbone, including edge load: `8688`
+- Tree transformers: `3685`
+- Percent transformers on backbone: `70.217%`
+- Capacity on backbone: `779970.0` kVA / `1100120.0` kVA
+- Demand on backbone: `483023.370` kW / `661466.740` kW
+- Percent demand on backbone: `73.023%`
 
 ## Length
 
-- Backbone length: `400041.913` m
-- Tree physical road-union length: `187749.290` m
-- Total physical length: `587791.203` m
-- Terminal attachment distance sum: `187749.290` m
-- Mean/max terminal distance to backbone: `36.064` m / `816.951` m
+- Backbone length: `514252.832` m
+- Tree physical road-union length: `153028.449` m
+- Total physical length: `667281.281` m
+- Terminal attachment distance sum: `153028.449` m
+- Mean/max terminal distance to backbone: `42.261` m / `816.951` m
 
 ## Failure Probabilities
 
 - Target mean edge probability: `0.0005`
-- Fitted failure rate per meter: `8.9751258e-06`
+- Fitted failure rate per meter: `6.7183062e-06`
 
 ## Reliability
 

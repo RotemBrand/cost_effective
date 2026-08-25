@@ -1,10 +1,10 @@
 # P2U ILP 2-Edge Solution
 
-- Status: `OPTIMAL`
+- Status: `TIME_LIMIT`
 - Stop reason: `2edge_connected`
-- Runtime: `572.96` s
-- Cut rounds: `144`
-- Added cuts: `13491`
+- Runtime: `901.39` s
+- Cut rounds: `703`
+- Added cuts: `29613`
 - Input nodes/edges: `5296` / `16985`
 - Solution nodes/edges: `5296` / `5345`
 - Solution cycle rank: `50`
@@ -14,11 +14,17 @@
 - Source incident constraints: `15`
 - Original sources with candidate edges: `15`
 - Selected original sources with incident edge: `15`
-- Objective length: `400041.913` m
-- Best bound: `396472.231`
-- MIP gap: `0.008923267903029431`
-- Redundancy constraint: `None`
-- Max redundancy constraint: `50`
+- Objective mode: `max_chain_demand_then_min_length`
+- Coverage attribute: `edge_size_kva`
+- Selected edge coverage: `234825.000`
+- Total edge coverage available: `330950.000`
+- Selected edge coverage fraction: `0.7095482701314398`
+- Selected total coverage fraction: `0.8902801636808794`
+- Objective length: `514252.832` m
+- Best bound from phase `minimize_length_at_chain_demand`: `329675.000`
+- MIP gap: `0.4039178111359523`
+- Redundancy constraint: `50`
+- Max redundancy constraint: `None`
 - Cut mode: `callback`
 - Threads: `0`
 - Requested MIPGap: `0.05`

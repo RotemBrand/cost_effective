@@ -1,8 +1,12 @@
 {
   "name": "original_full_p2u_mv",
+  "reliability_probability_mode": "fixed_original_length_failure_rate",
+  "edge_probability_graph": "source_graph",
+  "edge_failure_rate_per_length": 1.0798531853768255e-05,
+  "reference_p_mean": 0.0005,
   "generalized_structural_requested": true,
   "generalized_component_method": "projection",
-  "decomposition_runtime_seconds": 7.7233769000158645,
+  "decomposition_runtime_seconds": 5.365605700062588,
   "topology": {
     "raw_nodes": 12572,
     "raw_edges": 12728,
@@ -78,8 +82,8 @@
   "risk_float": {
     "total_weight": 661466.74,
     "output": "float",
-    "mean_edge_failure_prob": 0.0005,
-    "edge_failure_rate": 1.0798531853768255e-05,
+    "mean_edge_failure_prob": null,
+    "edge_failure_rate": null,
     "mean_actual_edge_probability": 0.0004997151942207036,
     "tree": 0.0022602489935313885,
     "nonbridge_section": 0.0,
@@ -90,9 +94,9 @@
   "risk_poly": {
     "total_weight": 661466.74,
     "output": "poly",
-    "mean_edge_failure_prob": 0.0005,
-    "edge_failure_rate": 1.0798531853768255e-05,
-    "mean_actual_edge_probability": 0.0004997151942207036,
+    "mean_edge_failure_prob": null,
+    "edge_failure_rate": null,
+    "mean_actual_edge_probability": 0.0,
     "tree": {
       "p0": 0.0,
       "p1": 4.54048893966938,

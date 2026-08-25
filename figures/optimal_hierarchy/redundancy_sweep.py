@@ -37,6 +37,7 @@ from figures.optimal_sfo.compare_p2u_old_new_reliability import (  # noqa: E402
     _prepare_new_graph,
     _prepare_old_graph,
 )
+from indexes.utilities import edge_probs_by_length  # noqa: E402
 
 
 OUTPUT_DIR = ROOT / "outputs" / "optimal_hierarchy"
@@ -57,6 +58,7 @@ class SweepParameters:
     tree_mode: str = "street_forest"
     generalized_method: str = "projection"
     redundancy_mode: str = "exact"
+    fixed_original_length_failure_rate: bool = True
 
 
 def mode_output_dir(redundancy_mode: str) -> Path:
@@ -179,6 +181,8 @@ def solve_backbone(
         return {**_read_json(paths["backbone_json"]), "stage_status": "reused"}
 
     graph, edges, transformer_nodes, source_nodes, original_source_incident = load_ilp_graph(CORRIDOR_GPKG)
+    if warm_start_gpkg is None and paths["backbone_gpkg"].exists():
+        warm_start_gpkg = paths["backbone_gpkg"]
     warm_start_edges = load_backbone_warm_start_edges(warm_start_gpkg)
     solution, summary = solve_min_2edge(
         graph,
@@ -229,10 +233,21 @@ def build_final_network(r_value: int, params: SweepParameters, *, reuse_existing
     return metadata
 
 
-def analyze_case(r_value: int, params: SweepParameters, *, reuse_existing: bool) -> dict[str, Any]:
+def analyze_case(
+    r_value: int,
+    params: SweepParameters,
+    *,
+    reuse_existing: bool,
+    edge_failure_rate_per_length: float | None,
+) -> dict[str, Any]:
     paths = case_paths(r_value, params.redundancy_mode)
     if reuse_existing and paths["risk_json"].exists() and paths["topology_json"].exists():
-        return {**_read_json(paths["risk_json"]), "stage_status": "reused"}
+        cached = _read_json(paths["risk_json"])
+        if (
+            not params.fixed_original_length_failure_rate
+            or cached.get("reliability_probability_mode") == "fixed_original_length_failure_rate"
+        ):
+            return {**cached, "stage_status": "reused"}
 
     topology_t0 = time.perf_counter()
     topology = analyze_final_network(
@@ -255,6 +270,7 @@ def analyze_case(r_value: int, params: SweepParameters, *, reuse_existing: bool)
         p_mean=params.p_mean,
         generalized=True,
         generalized_method=params.generalized_method,
+        edge_failure_rate_per_length=edge_failure_rate_per_length,
     )
     risk["topology_summary"] = topology
     risk["stage_status"] = "computed"
@@ -262,10 +278,20 @@ def analyze_case(r_value: int, params: SweepParameters, *, reuse_existing: bool)
     return risk
 
 
-def compute_original_reference(params: SweepParameters, *, reuse_existing: bool) -> dict[str, Any]:
+def compute_original_reference(
+    params: SweepParameters,
+    *,
+    reuse_existing: bool,
+    edge_failure_rate_per_length: float | None,
+) -> dict[str, Any]:
     output = OUTPUT_DIR / "p2u_original_reference_risk.json"
     if reuse_existing and output.exists():
-        return _read_json(output)
+        cached = _read_json(output)
+        if (
+            not params.fixed_original_length_failure_rate
+            or cached.get("reliability_probability_mode") == "fixed_original_length_failure_rate"
+        ):
+            return cached
     graph, sources, extra = _prepare_old_graph()
     reference = _analyze_one(
         name="original_full_p2u_mv",
@@ -275,6 +301,7 @@ def compute_original_reference(params: SweepParameters, *, reuse_existing: bool)
         p_mean=params.p_mean,
         generalized=True,
         generalized_method=params.generalized_method,
+        edge_failure_rate_per_length=edge_failure_rate_per_length,
     )
     _write_json(output, reference)
     return reference
@@ -519,9 +546,9 @@ def write_summary(rows: list[dict[str, Any]], stage_log: dict[str, Any], params:
         "",
         f"**Goal**: prepare an article-level P2U experiment where a road-constrained 2-edge-connected backbone is built under a redundancy {constraint_label} and all remaining transformers are attached as a street forest.",
         "",
-        "**Main result**: this manifest is the first clean sweep scaffold. It uses the R50-style parameters that produced the high `O(p^2)` structural-risk example and records the achieved network for each requested redundancy budget.",
+        "**Main result**: the demand-aware ILP protects contracted-chain demand that the length-only objective can ignore. The reliability result must still be judged by the decomposition: reducing the first-order tree/section risk is not enough if the selected 2-connected backbone creates long, unbalanced generalized chains and a large `O(p^2)` component.",
         "",
-        "All reliability rows use deterministic decomposition with length-scaled `p_mean = 5e-4`.",
+        f"All reliability rows use deterministic decomposition with `p_mean = {params.p_mean}`. When `fixed_original_length_failure_rate=True`, this is converted once on the original network into a fixed failure rate per meter and reused for every network.",
         "",
         md_table,
         "",
@@ -603,6 +630,7 @@ def write_summary(rows: list[dict[str, Any]], stage_log: dict[str, Any], params:
             f"- `tree_mode = {params.tree_mode}`",
             f"- `generalized_method = {params.generalized_method}`",
             f"- `redundancy_mode = {params.redundancy_mode}`",
+            f"- `fixed_original_length_failure_rate = {params.fixed_original_length_failure_rate}`",
             "",
             "## Implementation",
             "",
@@ -756,7 +784,22 @@ def main() -> None:
 
     stage_log["corridors"] = prepare_corridors(rebuild=args.rebuild_corridors)
     analysis_reuse_existing = args.reuse_existing and not args.refresh_analysis
-    original = compute_original_reference(params, reuse_existing=analysis_reuse_existing)
+    original_graph, _, _ = _prepare_old_graph()
+    _, reference_failure_rate = edge_probs_by_length(
+        original_graph,
+        p=params.p_mean,
+        mode="mean",
+        length_attr="length",
+    )
+    stage_log["reference_failure_rate_per_length"] = float(reference_failure_rate)
+    edge_failure_rate_per_length = (
+        float(reference_failure_rate) if params.fixed_original_length_failure_rate else None
+    )
+    original = compute_original_reference(
+        params,
+        reuse_existing=analysis_reuse_existing,
+        edge_failure_rate_per_length=edge_failure_rate_per_length,
+    )
     rows = [
         _case_row(
             r_request=None,
@@ -790,7 +833,12 @@ def main() -> None:
             stage_log["cases"][str(r_max)] = log
             raise RuntimeError(f"No backbone GeoPackage was written for R={r_max}: {backbone}")
         final = build_final_network(r_max, params, reuse_existing=args.reuse_existing or args.import_existing_optimal_sfo)
-        risk = analyze_case(r_max, params, reuse_existing=analysis_reuse_existing)
+        risk = analyze_case(
+            r_max,
+            params,
+            reuse_existing=analysis_reuse_existing,
+            edge_failure_rate_per_length=edge_failure_rate_per_length,
+        )
         plot = None if args.skip_plots else plot_network_png(r_max, params, reuse_existing=args.reuse_existing)
         log.update(
             {

@@ -3,11 +3,11 @@
   "final_graph_definition": "switch-section graph: graph nodes are transformer/source terminals plus optional zero-load street branch nodes; degree-2 transformer chains are stored as edge load; tree mode is street_forest",
   "tree_mode": "street_forest",
   "retained_backbone_road_nodes": 5310,
-  "all_backbone_terminal_sequence_road_nodes": 6616,
+  "all_backbone_terminal_sequence_road_nodes": 8174,
   "total_transformers_in_data": 12373,
   "unattached_tree_terminal_count": 0,
-  "tree_attachment_physical_road_union_length_m": 187749.2901489289,
-  "street_branch_nodes": 267,
+  "tree_attachment_physical_road_union_length_m": 153028.4491595659,
+  "street_branch_nodes": 240,
   "lv_assignment": {
     "lv_components": 12373,
     "lv_nodes": 69004,
@@ -30,5 +30,6 @@
   },
   "output_gpkg": "C:\\Users\\rotem\\Desktop\\\u05de\u05e1\u05de\u05db\u05d9\u05dd\\\u05ea\u05d5\u05d0\u05e8\\\u05ea\u05d6\u05d4\\\u05e1\u05d9\u05de\u05d5\u05dc\u05e6\u05d9\u05d5\u05ea\\cost_effective\\outputs\\optimal_hierarchy\\exact\\R050\\p2u_final_network_R50_streetforest_3857.gpkg",
   "metadata_json": "C:\\Users\\rotem\\Desktop\\\u05de\u05e1\u05de\u05db\u05d9\u05dd\\\u05ea\u05d5\u05d0\u05e8\\\u05ea\u05d6\u05d4\\\u05e1\u05d9\u05de\u05d5\u05dc\u05e6\u05d9\u05d5\u05ea\\cost_effective\\outputs\\optimal_hierarchy\\exact\\R050\\p2u_final_network_R50_streetforest_metadata.json",
-  "imported_from": "C:\\Users\\rotem\\Desktop\\\u05de\u05e1\u05de\u05db\u05d9\u05dd\\\u05ea\u05d5\u05d0\u05e8\\\u05ea\u05d6\u05d4\\\u05e1\u05d9\u05de\u05d5\u05dc\u05e6\u05d9\u05d5\u05ea\\cost_effective\\outputs\\optimal_sfo\\p2u_final_network_Rmax50_streetforest_metadata.json"
+  "stage_runtime_s": 20.17318330006674,
+  "stage_status": "built"
 }
