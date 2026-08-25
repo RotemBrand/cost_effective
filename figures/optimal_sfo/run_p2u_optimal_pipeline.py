@@ -28,6 +28,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--ilp-threads", type=int, default=0)
     parser.add_argument("--ilp-max-cut-rounds", type=int, default=100)
     parser.add_argument("--ilp-max-redundancy", type=int, default=None)
+    parser.add_argument("--ilp-cut-mode", choices=["iterative", "callback"], default="callback")
+    parser.add_argument(
+        "--ilp-objective-mode",
+        choices=["min_length", "max_chain_demand_then_min_length"],
+        default="max_chain_demand_then_min_length",
+    )
+    parser.add_argument("--ilp-coverage-attr", default="edge_size_kva")
+    parser.add_argument("--ilp-coverage-tolerance", type=float, default=1e-6)
     parser.add_argument("--tree-mode", choices=["street_forest", "star"], default="street_forest")
     parser.add_argument("--p-mean", type=float, default=5e-4)
     parser.add_argument("--n-samples", type=int, default=0)
@@ -46,6 +54,10 @@ def run_ilp_stage(args: argparse.Namespace) -> dict:
         mip_gap=args.ilp_mip_gap,
         threads=args.ilp_threads,
         max_cut_rounds=args.ilp_max_cut_rounds,
+        cut_mode=args.ilp_cut_mode,
+        objective_mode=args.ilp_objective_mode,
+        coverage_attr=args.ilp_coverage_attr,
+        coverage_tolerance=args.ilp_coverage_tolerance,
     )
     write_solution(solution, summary, edges, transformer_nodes, source_nodes)
     return summary

@@ -51,6 +51,9 @@ class SweepParameters:
     ilp_threads: int = 0
     ilp_max_cut_rounds: int = 100
     ilp_cut_mode: str = "callback"
+    ilp_objective_mode: str = "max_chain_demand_then_min_length"
+    ilp_coverage_attr: str = "edge_size_kva"
+    ilp_coverage_tolerance: float = 1e-6
     tree_mode: str = "street_forest"
     generalized_method: str = "projection"
     redundancy_mode: str = "exact"
@@ -188,6 +191,9 @@ def solve_backbone(
         max_cut_rounds=params.ilp_max_cut_rounds,
         cut_mode=params.ilp_cut_mode,
         warm_start_edges=warm_start_edges,
+        objective_mode=params.ilp_objective_mode,
+        coverage_attr=params.ilp_coverage_attr,
+        coverage_tolerance=params.ilp_coverage_tolerance,
     )
     summary["warm_start_gpkg"] = str(warm_start_gpkg) if warm_start_gpkg else None
     summary["redundancy_mode"] = params.redundancy_mode
@@ -362,6 +368,16 @@ def _case_row(
         "ilp_status": None if backbone_summary is None else backbone_summary.get("status_name"),
         "ilp_runtime_s": None if backbone_summary is None else backbone_summary.get("runtime_s"),
         "ilp_mip_gap": None if backbone_summary is None else backbone_summary.get("mip_gap"),
+        "ilp_objective_mode": None if backbone_summary is None else backbone_summary.get("objective_mode"),
+        "selected_chain_demand_kva": (
+            None if backbone_summary is None else backbone_summary.get("selected_edge_coverage_weight")
+        ),
+        "available_chain_demand_kva": (
+            None if backbone_summary is None else backbone_summary.get("total_edge_coverage_weight")
+        ),
+        "selected_chain_demand_fraction": (
+            None if backbone_summary is None else backbone_summary.get("selected_edge_coverage_fraction")
+        ),
         "decomposition_runtime_s": analysis.get("decomposition_runtime_seconds"),
     }
 
@@ -464,6 +480,8 @@ def write_summary(rows: list[dict[str, Any]], stage_log: dict[str, Any], params:
         "gen_lambda_mean_km",
         "gen_lambda_sigma_over_mean",
         "gen_lambda_max_km",
+        "selected_chain_demand_kva",
+        "selected_chain_demand_fraction",
         "ilp_runtime_s",
         "decomposition_runtime_s",
     ]
@@ -471,7 +489,12 @@ def write_summary(rows: list[dict[str, Any]], stage_log: dict[str, Any], params:
     r_values = [str(int(row["r_request"])) for row in rows if row.get("r_request") is not None]
     achieved_r_values = sorted({int(row["r_theory"]) for row in rows if row.get("r_request") is not None})
     flat_budget_note = ""
-    if params.redundancy_mode == "max" and len(achieved_r_values) == 1 and len(r_values) > 1:
+    if (
+        params.redundancy_mode == "max"
+        and params.ilp_objective_mode == "min_length"
+        and len(achieved_r_values) == 1
+        and len(r_values) > 1
+    ):
         flat_budget_note = (
             f"- All requested upper bounds selected the same achieved `R={achieved_r_values[0]}` backbone. "
             "This is expected for a pure minimum-length objective with `R <= R_max`: extra redundancy is allowed but not rewarded."
@@ -538,10 +561,16 @@ def write_summary(rows: list[dict[str, Any]], stage_log: dict[str, Any], params:
             "",
             "## Algorithm",
             "",
-            "For each requested redundancy value, the pipeline uses the road-corridor terminal graph and solves a minimum-length 2-edge-connected backbone ILP:",
+            "For each requested redundancy value, the pipeline uses the road-corridor terminal graph and solves a 2-edge-connected backbone ILP. In `min_length` mode it solves:",
             "",
             "$$",
             "\\min \\sum_e w_e x_e",
+            "$$",
+            "",
+            "In `max_chain_demand_then_min_length` mode it first maximizes selected demand represented by contracted degree-2 corridor sections, then fixes that demand level and minimizes length:",
+            "",
+            "$$",
+            "\\max \\sum_e q_e x_e, \\qquad \\min \\sum_e w_e x_e \\;\\; \\mathrm{subject\\ to\\ the\\ selected\\ } \\sum_e q_e x_e.",
             "$$",
             "",
             "subject to degree, source-incidence, lazy 2-edge cut constraints, and the selected redundancy constraint:",
@@ -569,6 +598,8 @@ def write_summary(rows: list[dict[str, Any]], stage_log: dict[str, Any], params:
             f"- `MIPGap = {params.ilp_mip_gap}`",
             f"- `Threads = {params.ilp_threads}`",
             f"- `cut_mode = {params.ilp_cut_mode}`",
+            f"- `objective_mode = {params.ilp_objective_mode}`",
+            f"- `coverage_attr = {params.ilp_coverage_attr}`",
             f"- `tree_mode = {params.tree_mode}`",
             f"- `generalized_method = {params.generalized_method}`",
             f"- `redundancy_mode = {params.redundancy_mode}`",
@@ -685,6 +716,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--threads", type=int, default=0)
     parser.add_argument("--max-cut-rounds", type=int, default=100)
     parser.add_argument("--cut-mode", choices=["iterative", "callback"], default="callback")
+    parser.add_argument(
+        "--objective-mode",
+        choices=["min_length", "max_chain_demand_then_min_length"],
+        default="max_chain_demand_then_min_length",
+        help="ILP objective. The demand-aware mode maximizes selected contracted-chain load before minimizing length.",
+    )
+    parser.add_argument("--coverage-attr", default="edge_size_kva")
+    parser.add_argument("--coverage-tolerance", type=float, default=1e-6)
     parser.add_argument("--p-mean", type=float, default=5e-4)
     parser.add_argument("--generalized-method", choices=["projection", "networkx"], default="projection")
     parser.add_argument("--redundancy-mode", choices=["exact", "max"], default="exact")
@@ -705,6 +744,9 @@ def main() -> None:
         ilp_threads=args.threads,
         ilp_max_cut_rounds=args.max_cut_rounds,
         ilp_cut_mode=args.cut_mode,
+        ilp_objective_mode=args.objective_mode,
+        ilp_coverage_attr=args.coverage_attr,
+        ilp_coverage_tolerance=args.coverage_tolerance,
         generalized_method=args.generalized_method,
         redundancy_mode=args.redundancy_mode,
     )

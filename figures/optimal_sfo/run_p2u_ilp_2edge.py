@@ -95,11 +95,16 @@ def solve_min_2edge(
     max_cut_rounds: int,
     cut_mode: str = "iterative",
     warm_start_edges: set[tuple[str, str]] | None = None,
+    objective_mode: str = "min_length",
+    coverage_attr: str = "edge_size_kva",
+    coverage_tolerance: float = 1e-6,
 ) -> tuple[nx.Graph | None, dict]:
     if redundancy is not None and max_redundancy is not None:
         raise ValueError("Use either exact redundancy or max_redundancy, not both")
     if cut_mode not in {"iterative", "callback"}:
         raise ValueError("cut_mode must be 'iterative' or 'callback'")
+    if objective_mode not in {"min_length", "max_chain_demand_then_min_length"}:
+        raise ValueError("objective_mode must be 'min_length' or 'max_chain_demand_then_min_length'")
 
     nodes = sorted(graph.nodes)
     edges = sorted(_edge_key(u, v) for u, v in graph.edges)
@@ -147,10 +152,12 @@ def solve_min_2edge(
             name="max_edge_budget",
         )
 
-    model.setObjective(
-        gp.quicksum(float(graph.edges[e]["length_m"]) * x[e] for e in edges),
-        GRB.MINIMIZE,
-    )
+    length_expr = gp.quicksum(float(graph.edges[e]["length_m"]) * x[e] for e in edges)
+    coverage_weights = {e: float(graph.edges[e].get(coverage_attr, 0.0) or 0.0) for e in edges}
+    coverage_expr = gp.quicksum(coverage_weights[e] * x[e] for e in edges)
+    node_coverage_weight = sum(float(graph.nodes[node].get("size_kva", 0.0) or 0.0) for node in nodes)
+    total_edge_coverage_weight = sum(coverage_weights.values())
+    objective_phases: list[dict] = []
 
     start = time.time()
     cut_round = 0
@@ -184,60 +191,132 @@ def solve_min_2edge(
                 cutsets.append(crossing)
         return cutsets
 
-    if cut_mode == "callback":
-        callback_stats = {"rounds": 0, "cuts": 0}
+    def run_optimization_phase(phase_name: str) -> None:
+        nonlocal cut_round, total_added_cuts, selected_edges, stop_reason
+        phase_start = time.time()
+        cuts_before = total_added_cuts
+        rounds_before = cut_round
+        if cut_mode == "callback":
+            callback_stats = {"rounds": 0, "cuts": 0}
 
-        def add_lazy_cuts(cb_model, where):
-            if where != GRB.Callback.MIPSOL:
-                return
-            vals = cb_model.cbGetSolution(x)
-            incumbent_edges = [e for e in edges if vals[e] > 0.5]
-            cutsets = violated_cutsets(incumbent_edges)
-            if not cutsets:
-                return
-            callback_stats["rounds"] += 1
-            callback_stats["cuts"] += len(cutsets)
-            for crossing in cutsets:
-                cb_model.cbLazy(gp.quicksum(x[e] for e in crossing) >= 2)
+            def add_lazy_cuts(cb_model, where):
+                if where != GRB.Callback.MIPSOL:
+                    return
+                vals = cb_model.cbGetSolution(x)
+                incumbent_edges = [e for e in edges if vals[e] > 0.5]
+                cutsets = violated_cutsets(incumbent_edges)
+                if not cutsets:
+                    return
+                callback_stats["rounds"] += 1
+                callback_stats["cuts"] += len(cutsets)
+                for crossing in cutsets:
+                    cb_model.cbLazy(gp.quicksum(x[e] for e in crossing) >= 2)
 
-        model.optimize(add_lazy_cuts)
-        cut_round = int(callback_stats["rounds"])
-        total_added_cuts = int(callback_stats["cuts"])
-        if model.SolCount == 0:
-            stop_reason = "no_solution"
-        else:
-            selected_edges = [e for e in edges if x[e].X > 0.5]
-            if violated_cutsets(selected_edges):
-                stop_reason = "time_limit_with_violated_cuts" if model.Status == GRB.TIME_LIMIT else "violated_cuts_remaining"
-            else:
-                stop_reason = "2edge_connected"
-    else:
-        while cut_round < max_cut_rounds:
             if time_limit > 0:
                 remaining_time = time_limit - (time.time() - start)
                 if remaining_time <= 0:
                     stop_reason = "global_time_limit"
-                    break
+                    objective_phases.append(
+                        {
+                            "phase": phase_name,
+                            "status_name": "SKIPPED_TIME_LIMIT",
+                            "runtime_s": 0.0,
+                            "cut_rounds": 0,
+                            "added_cuts": 0,
+                        }
+                    )
+                    return
                 model.Params.TimeLimit = remaining_time
-            cut_round += 1
-            model.optimize()
+
+            model.optimize(add_lazy_cuts)
+            cut_round += int(callback_stats["rounds"])
+            total_added_cuts += int(callback_stats["cuts"])
             if model.SolCount == 0:
                 stop_reason = "no_solution"
-                break
+            else:
+                selected_edges = [e for e in edges if x[e].X > 0.5]
+                if violated_cutsets(selected_edges):
+                    stop_reason = "time_limit_with_violated_cuts" if model.Status == GRB.TIME_LIMIT else "violated_cuts_remaining"
+                else:
+                    stop_reason = "2edge_connected"
+        else:
+            while cut_round < max_cut_rounds:
+                if time_limit > 0:
+                    remaining_time = time_limit - (time.time() - start)
+                    if remaining_time <= 0:
+                        stop_reason = "global_time_limit"
+                        break
+                    model.Params.TimeLimit = remaining_time
+                cut_round += 1
+                model.optimize()
+                if model.SolCount == 0:
+                    stop_reason = "no_solution"
+                    break
 
-            selected_edges = [e for e in edges if x[e].X > 0.5]
-            cutsets = violated_cutsets(selected_edges)
-            if not cutsets:
-                stop_reason = "2edge_connected"
-                break
+                selected_edges = [e for e in edges if x[e].X > 0.5]
+                cutsets = violated_cutsets(selected_edges)
+                if not cutsets:
+                    stop_reason = "2edge_connected"
+                    break
 
-            for crossing in cutsets:
-                model.addConstr(gp.quicksum(x[e] for e in crossing) >= 2)
+                for crossing in cutsets:
+                    model.addConstr(gp.quicksum(x[e] for e in crossing) >= 2)
 
-            total_added_cuts += len(cutsets)
-            model.update()
+                total_added_cuts += len(cutsets)
+                model.update()
+
+        objective_phases.append(
+            {
+                "phase": phase_name,
+                "status": int(model.Status),
+                "status_name": _gurobi_status_name(model.Status),
+                "stop_reason": stop_reason,
+                "runtime_s": time.time() - phase_start,
+                "cut_rounds": cut_round - rounds_before,
+                "added_cuts": total_added_cuts - cuts_before,
+                "solution_count": int(model.SolCount),
+                "objective_value": float(model.ObjVal) if model.SolCount else None,
+                "best_bound": float(model.ObjBound) if model.SolCount else None,
+                "mip_gap": float(model.MIPGap) if model.SolCount else None,
+                "selected_edge_coverage_weight": float(sum(coverage_weights[e] for e in selected_edges)),
+                "selected_length_m": float(sum(float(graph.edges[e]["length_m"]) for e in selected_edges)),
+            }
+        )
+
+    if objective_mode == "max_chain_demand_then_min_length":
+        model.setObjective(coverage_expr, GRB.MAXIMIZE)
+        run_optimization_phase("maximize_chain_demand")
+        if model.SolCount > 0:
+            selected_coverage = float(sum(coverage_weights[e] for e in selected_edges))
+            remaining_time = time_limit - (time.time() - start) if time_limit > 0 else None
+            if remaining_time is None or remaining_time > 1.0:
+                model.addConstr(
+                    coverage_expr >= max(0.0, selected_coverage - float(coverage_tolerance)),
+                    name="selected_chain_demand_floor",
+                )
+                model.setObjective(length_expr, GRB.MINIMIZE)
+                model.update()
+                run_optimization_phase("minimize_length_at_chain_demand")
+            else:
+                objective_phases.append(
+                    {
+                        "phase": "minimize_length_at_chain_demand",
+                        "status_name": "SKIPPED_TIME_LIMIT",
+                        "runtime_s": 0.0,
+                        "cut_rounds": 0,
+                        "added_cuts": 0,
+                        "selected_edge_coverage_weight": selected_coverage,
+                        "selected_length_m": float(sum(float(graph.edges[e]["length_m"]) for e in selected_edges)),
+                    }
+                )
+    else:
+        model.setObjective(length_expr, GRB.MINIMIZE)
+        run_optimization_phase("minimize_length")
 
     elapsed = time.time() - start
+    selected_length_m = float(sum(float(graph.edges[e]["length_m"]) for e in selected_edges))
+    selected_edge_coverage_weight = float(sum(coverage_weights[e] for e in selected_edges))
+    selected_total_coverage_weight = float(node_coverage_weight + selected_edge_coverage_weight)
     if model.SolCount == 0:
         return None, {
             "status": int(model.Status),
@@ -256,6 +335,12 @@ def solve_min_2edge(
             "cut_mode": cut_mode,
             "source_connectivity_constraints": source_connectivity_constraints,
             "warm_start_edges": len(warm_start_edges),
+            "objective_mode": objective_mode,
+            "coverage_attr": coverage_attr,
+            "objective_phases": objective_phases,
+            "best_bound_phase": objective_phases[-1]["phase"] if objective_phases else None,
+            "node_coverage_weight": float(node_coverage_weight),
+            "total_edge_coverage_weight": float(total_edge_coverage_weight),
         }
 
     solution = nx.Graph()
@@ -271,7 +356,7 @@ def solve_min_2edge(
         "runtime_s": elapsed,
         "cut_rounds": cut_round,
         "added_cuts": total_added_cuts,
-        "objective_length_m": float(model.ObjVal),
+        "objective_length_m": selected_length_m,
         "best_bound": float(model.ObjBound),
         "mip_gap": float(model.MIPGap) if model.SolCount else None,
         "input_nodes": graph.number_of_nodes(),
@@ -290,6 +375,22 @@ def solve_min_2edge(
         "cut_mode": cut_mode,
         "source_connectivity_constraints": source_connectivity_constraints,
         "warm_start_edges": len(warm_start_edges),
+        "objective_mode": objective_mode,
+        "coverage_attr": coverage_attr,
+        "objective_phases": objective_phases,
+        "best_bound_phase": objective_phases[-1]["phase"] if objective_phases else None,
+        "node_coverage_weight": float(node_coverage_weight),
+        "total_edge_coverage_weight": float(total_edge_coverage_weight),
+        "selected_edge_coverage_weight": selected_edge_coverage_weight,
+        "selected_total_coverage_weight": selected_total_coverage_weight,
+        "selected_edge_coverage_fraction": (
+            selected_edge_coverage_weight / total_edge_coverage_weight if total_edge_coverage_weight > 0 else None
+        ),
+        "selected_total_coverage_fraction": (
+            selected_total_coverage_weight / (node_coverage_weight + total_edge_coverage_weight)
+            if node_coverage_weight + total_edge_coverage_weight > 0
+            else None
+        ),
         "selected_original_sources_with_incident_edge": _count_selected_sources(solution, original_source_incident),
         "original_sources_with_candidate_edges": len([s for s, es in (original_source_incident or {}).items() if es]),
     }
@@ -376,8 +477,14 @@ def _summary_markdown(summary: dict) -> str:
         f"- Source incident constraints: `{summary.get('source_connectivity_constraints')}`",
         f"- Original sources with candidate edges: `{summary.get('original_sources_with_candidate_edges')}`",
         f"- Selected original sources with incident edge: `{summary.get('selected_original_sources_with_incident_edge')}`",
+        f"- Objective mode: `{summary.get('objective_mode')}`",
+        f"- Coverage attribute: `{summary.get('coverage_attr')}`",
+        f"- Selected edge coverage: `{summary.get('selected_edge_coverage_weight', 0):.3f}`",
+        f"- Total edge coverage available: `{summary.get('total_edge_coverage_weight', 0):.3f}`",
+        f"- Selected edge coverage fraction: `{summary.get('selected_edge_coverage_fraction')}`",
+        f"- Selected total coverage fraction: `{summary.get('selected_total_coverage_fraction')}`",
         f"- Objective length: `{summary.get('objective_length_m', 0):.3f}` m",
-        f"- Best bound: `{summary.get('best_bound', 0):.3f}`",
+        f"- Best bound from phase `{summary.get('best_bound_phase')}`: `{summary.get('best_bound', 0):.3f}`",
         f"- MIP gap: `{summary.get('mip_gap')}`",
         f"- Redundancy constraint: `{summary.get('redundancy_constraint')}`",
         f"- Max redundancy constraint: `{summary.get('max_redundancy_constraint')}`",
@@ -398,6 +505,13 @@ def main() -> None:
     parser.add_argument("--threads", type=int, default=0)
     parser.add_argument("--max-cut-rounds", type=int, default=100)
     parser.add_argument("--cut-mode", choices=["iterative", "callback"], default="iterative")
+    parser.add_argument(
+        "--objective-mode",
+        choices=["min_length", "max_chain_demand_then_min_length"],
+        default="min_length",
+    )
+    parser.add_argument("--coverage-attr", default="edge_size_kva")
+    parser.add_argument("--coverage-tolerance", type=float, default=1e-6)
     parser.add_argument("--output-gpkg", type=Path, default=OUTPUT_GPKG)
     parser.add_argument("--summary-json", type=Path, default=SUMMARY_JSON)
     parser.add_argument("--summary-md", type=Path, default=SUMMARY_MD)
@@ -414,6 +528,9 @@ def main() -> None:
         threads=args.threads,
         max_cut_rounds=args.max_cut_rounds,
         cut_mode=args.cut_mode,
+        objective_mode=args.objective_mode,
+        coverage_attr=args.coverage_attr,
+        coverage_tolerance=args.coverage_tolerance,
     )
     write_solution(
         solution,
