@@ -24,7 +24,13 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from figures.optimal_sfo.analyze_p2u_final_network import analyze_final_network  # noqa: E402
-from figures.optimal_sfo.p2u_final_network import build_and_write_final_network  # noqa: E402
+from figures.optimal_sfo.p2u_final_network import (  # noqa: E402
+    build_and_write_final_network,
+    build_road_graph,
+    read_p2u_layer,
+    sequence_road_nodes,
+    transformers_by_street_node,
+)
 from figures.optimal_sfo.prepare_p2u_corridor_network import build_corridor_outputs  # noqa: E402
 from figures.optimal_sfo.run_p2u_ilp_2edge import (  # noqa: E402
     SUPER_SOURCE,
@@ -52,9 +58,11 @@ class SweepParameters:
     ilp_threads: int = 0
     ilp_max_cut_rounds: int = 100
     ilp_cut_mode: str = "callback"
-    ilp_objective_mode: str = "max_chain_demand_then_min_length"
+    ilp_objective_mode: str = "max_chain_demand_under_cost"
     ilp_coverage_attr: str = "edge_size_kva"
     ilp_coverage_tolerance: float = 1e-6
+    ilp_source_min_incident_edges: int = 2
+    cost_alpha: float = 1.02
     tree_mode: str = "street_forest"
     generalized_method: str = "projection"
     redundancy_mode: str = "exact"
@@ -128,6 +136,77 @@ def load_backbone_warm_start_edges(gpkg: Path | None) -> set[tuple[str, str]]:
     return warm_edges
 
 
+def estimate_cost_budget_components(
+    graph: nx.Graph,
+    source_nodes: gpd.GeoDataFrame,
+    *,
+    original_length_m: float,
+    alpha: float,
+) -> dict[str, Any]:
+    branches = read_p2u_layer("StreetMap_branches")
+    street_nodes = read_p2u_layer("StreetMap_nodes").copy()
+    road_graph, _ = build_road_graph(branches, street_nodes)
+    transformer_by_road, _, _ = transformers_by_street_node(street_nodes)
+
+    candidate_road_nodes = {
+        str(data.get("road_node"))
+        for node, data in graph.nodes(data=True)
+        if node != SUPER_SOURCE and str(data.get("road_node")) in road_graph
+    }
+    candidate_road_nodes.update(
+        str(node)
+        for node in source_nodes["road_node"].astype(str)
+        if str(node) in road_graph
+    )
+    for _, _, data in graph.edges(data=True):
+        for road_node in sequence_road_nodes(str(data.get("terminal_sequence", ""))):
+            if road_node in road_graph:
+                candidate_road_nodes.add(road_node)
+
+    fixed_outside_nodes = sorted(set(transformer_by_road) - candidate_road_nodes)
+    fixed_tree_edges: set[tuple[str, str]] = set()
+    unattached_fixed_nodes = 0
+    if candidate_road_nodes:
+        _, paths = nx.multi_source_dijkstra(
+            road_graph,
+            sources=list(candidate_road_nodes),
+            weight="length_m",
+        )
+        for road_node in fixed_outside_nodes:
+            path = paths.get(road_node)
+            if not path:
+                unattached_fixed_nodes += 1
+                continue
+            for u, v in zip(path, path[1:]):
+                fixed_tree_edges.add(_edge_key(u, v))
+    else:
+        unattached_fixed_nodes = len(fixed_outside_nodes)
+
+    fixed_tree_length_m = float(
+        sum(
+            road_graph.edges[u, v]["length_m"]
+            for u, v in fixed_tree_edges
+            if road_graph.has_edge(u, v)
+        )
+    )
+    chain_tree_service_length_m = float(
+        sum(float(data.get("chain_tree_service_length_m", 0.0) or 0.0) for _, _, data in graph.edges(data=True))
+    )
+    total_budget_m = float(alpha) * float(original_length_m)
+    chain_extra_cost_budget_m = total_budget_m - fixed_tree_length_m - chain_tree_service_length_m
+    return {
+        "cost_alpha": float(alpha),
+        "original_length_m": float(original_length_m),
+        "total_cost_budget_m": float(total_budget_m),
+        "fixed_outside_tree_length_m": fixed_tree_length_m,
+        "fixed_outside_transformer_road_nodes": int(len(fixed_outside_nodes)),
+        "fixed_outside_unattached_road_nodes": int(unattached_fixed_nodes),
+        "candidate_road_nodes": int(len(candidate_road_nodes)),
+        "chain_tree_service_length_m": chain_tree_service_length_m,
+        "chain_extra_cost_budget_m": float(chain_extra_cost_budget_m),
+    }
+
+
 def prepare_corridors(*, rebuild: bool) -> dict[str, Any]:
     if CORRIDOR_GPKG.exists() and not rebuild:
         return {"status": "reused", "output_gpkg": str(CORRIDOR_GPKG)}
@@ -175,6 +254,7 @@ def solve_backbone(
     *,
     reuse_existing: bool,
     warm_start_gpkg: Path | None = None,
+    original_length_m: float | None = None,
 ) -> dict[str, Any]:
     paths = case_paths(r_value, params.redundancy_mode)
     if reuse_existing and paths["backbone_json"].exists() and paths["backbone_gpkg"].exists():
@@ -184,6 +264,20 @@ def solve_backbone(
     if warm_start_gpkg is None and paths["backbone_gpkg"].exists():
         warm_start_gpkg = paths["backbone_gpkg"]
     warm_start_edges = load_backbone_warm_start_edges(warm_start_gpkg)
+    cost_budget_components = None
+    chain_extra_cost_budget_m = None
+    if params.ilp_objective_mode == "max_chain_demand_under_cost":
+        if original_length_m is None:
+            raise ValueError("original_length_m is required for max_chain_demand_under_cost")
+        cost_budget_components = estimate_cost_budget_components(
+            graph,
+            source_nodes,
+            original_length_m=original_length_m,
+            alpha=params.cost_alpha,
+        )
+        chain_extra_cost_budget_m = float(cost_budget_components["chain_extra_cost_budget_m"])
+        if chain_extra_cost_budget_m < 0:
+            raise ValueError(f"Negative chain extra cost budget: {cost_budget_components}")
     solution, summary = solve_min_2edge(
         graph,
         original_source_incident=original_source_incident,
@@ -198,7 +292,11 @@ def solve_backbone(
         objective_mode=params.ilp_objective_mode,
         coverage_attr=params.ilp_coverage_attr,
         coverage_tolerance=params.ilp_coverage_tolerance,
+        source_min_incident_edges=params.ilp_source_min_incident_edges,
+        chain_extra_cost_budget_m=chain_extra_cost_budget_m,
     )
+    if cost_budget_components is not None:
+        summary["cost_budget_components"] = cost_budget_components
     summary["warm_start_gpkg"] = str(warm_start_gpkg) if warm_start_gpkg else None
     summary["redundancy_mode"] = params.redundancy_mode
     write_solution(
@@ -405,6 +503,31 @@ def _case_row(
         "selected_chain_demand_fraction": (
             None if backbone_summary is None else backbone_summary.get("selected_edge_coverage_fraction")
         ),
+        "cost_alpha": (
+            None if backbone_summary is None else (backbone_summary.get("cost_budget_components") or {}).get("cost_alpha")
+        ),
+        "chain_extra_cost_budget_km": (
+            None
+            if backbone_summary is None or backbone_summary.get("chain_extra_cost_budget_m") is None
+            else float(backbone_summary.get("chain_extra_cost_budget_m")) / 1000.0
+        ),
+        "selected_chain_extra_cost_km": (
+            None
+            if backbone_summary is None or backbone_summary.get("selected_chain_extra_cost_m") is None
+            else float(backbone_summary.get("selected_chain_extra_cost_m")) / 1000.0
+        ),
+        "fixed_outside_tree_cost_km": (
+            None
+            if backbone_summary is None
+            else (backbone_summary.get("cost_budget_components") or {}).get("fixed_outside_tree_length_m", 0.0)
+            / 1000.0
+        ),
+        "chain_tree_service_cost_km": (
+            None
+            if backbone_summary is None
+            else (backbone_summary.get("cost_budget_components") or {}).get("chain_tree_service_length_m", 0.0)
+            / 1000.0
+        ),
         "decomposition_runtime_s": analysis.get("decomposition_runtime_seconds"),
     }
 
@@ -509,6 +632,10 @@ def write_summary(rows: list[dict[str, Any]], stage_log: dict[str, Any], params:
         "gen_lambda_max_km",
         "selected_chain_demand_kva",
         "selected_chain_demand_fraction",
+        "chain_extra_cost_budget_km",
+        "selected_chain_extra_cost_km",
+        "fixed_outside_tree_cost_km",
+        "chain_tree_service_cost_km",
         "ilp_runtime_s",
         "decomposition_runtime_s",
     ]
@@ -600,6 +727,12 @@ def write_summary(rows: list[dict[str, Any]], stage_log: dict[str, Any], params:
             "\\max \\sum_e q_e x_e, \\qquad \\min \\sum_e w_e x_e \\;\\; \\mathrm{subject\\ to\\ the\\ selected\\ } \\sum_e q_e x_e.",
             "$$",
             "",
+            "In `max_chain_demand_under_cost` mode, used for the current cost-comparable experiment, each contracted chain has a radial-service baseline `L_q - max_l l_{q,l}` and an extra backbone cost `max_l l_{q,l}`. The model maximizes selected chain demand subject to:",
+            "",
+            "$$",
+            "\\sum_q \\max_l \\ell_{q,l} x_q \\leq \\alpha W_0 - W_\\mathrm{fixed\\ tree} - \\sum_q \\left(L_q - \\max_l \\ell_{q,l}\\right).",
+            "$$",
+            "",
             "subject to degree, source-incidence, lazy 2-edge cut constraints, and the selected redundancy constraint:",
             "",
             constraint_text,
@@ -627,6 +760,8 @@ def write_summary(rows: list[dict[str, Any]], stage_log: dict[str, Any], params:
             f"- `cut_mode = {params.ilp_cut_mode}`",
             f"- `objective_mode = {params.ilp_objective_mode}`",
             f"- `coverage_attr = {params.ilp_coverage_attr}`",
+            f"- `source_min_incident_edges = {params.ilp_source_min_incident_edges}`",
+            f"- `cost_alpha = {params.cost_alpha}`",
             f"- `tree_mode = {params.tree_mode}`",
             f"- `generalized_method = {params.generalized_method}`",
             f"- `redundancy_mode = {params.redundancy_mode}`",
@@ -746,12 +881,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--cut-mode", choices=["iterative", "callback"], default="callback")
     parser.add_argument(
         "--objective-mode",
-        choices=["min_length", "max_chain_demand_then_min_length"],
-        default="max_chain_demand_then_min_length",
+        choices=["min_length", "max_chain_demand_then_min_length", "max_chain_demand_under_cost"],
+        default="max_chain_demand_under_cost",
         help="ILP objective. The demand-aware mode maximizes selected contracted-chain load before minimizing length.",
     )
     parser.add_argument("--coverage-attr", default="edge_size_kva")
     parser.add_argument("--coverage-tolerance", type=float, default=1e-6)
+    parser.add_argument("--source-min-incident-edges", type=int, default=2)
+    parser.add_argument("--cost-alpha", type=float, default=1.02)
     parser.add_argument("--p-mean", type=float, default=5e-4)
     parser.add_argument("--generalized-method", choices=["projection", "networkx"], default="projection")
     parser.add_argument("--redundancy-mode", choices=["exact", "max"], default="exact")
@@ -775,6 +912,8 @@ def main() -> None:
         ilp_objective_mode=args.objective_mode,
         ilp_coverage_attr=args.coverage_attr,
         ilp_coverage_tolerance=args.coverage_tolerance,
+        ilp_source_min_incident_edges=args.source_min_incident_edges,
+        cost_alpha=args.cost_alpha,
         generalized_method=args.generalized_method,
         redundancy_mode=args.redundancy_mode,
     )
@@ -800,6 +939,7 @@ def main() -> None:
         reuse_existing=analysis_reuse_existing,
         edge_failure_rate_per_length=edge_failure_rate_per_length,
     )
+    original_length_m = float(original["topology"]["total_length_m"])
     rows = [
         _case_row(
             r_request=None,
@@ -824,6 +964,7 @@ def main() -> None:
             params,
             reuse_existing=args.reuse_existing or args.import_existing_optimal_sfo,
             warm_start_gpkg=previous_backbone_gpkg,
+            original_length_m=original_length_m,
         )
         if paths["backbone_gpkg"].exists():
             previous_backbone_gpkg = paths["backbone_gpkg"]

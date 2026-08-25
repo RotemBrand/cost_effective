@@ -31,11 +31,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--ilp-cut-mode", choices=["iterative", "callback"], default="callback")
     parser.add_argument(
         "--ilp-objective-mode",
-        choices=["min_length", "max_chain_demand_then_min_length"],
-        default="max_chain_demand_then_min_length",
+        choices=["min_length", "max_chain_demand_then_min_length", "max_chain_demand_under_cost"],
+        default="max_chain_demand_under_cost",
     )
     parser.add_argument("--ilp-coverage-attr", default="edge_size_kva")
     parser.add_argument("--ilp-coverage-tolerance", type=float, default=1e-6)
+    parser.add_argument("--ilp-source-min-incident-edges", type=int, default=2)
+    parser.add_argument("--ilp-chain-extra-cost-budget-m", type=float, default=None)
     parser.add_argument("--tree-mode", choices=["street_forest", "star"], default="street_forest")
     parser.add_argument("--p-mean", type=float, default=5e-4)
     parser.add_argument("--n-samples", type=int, default=0)
@@ -58,6 +60,8 @@ def run_ilp_stage(args: argparse.Namespace) -> dict:
         objective_mode=args.ilp_objective_mode,
         coverage_attr=args.ilp_coverage_attr,
         coverage_tolerance=args.ilp_coverage_tolerance,
+        source_min_incident_edges=args.ilp_source_min_incident_edges,
+        chain_extra_cost_budget_m=args.ilp_chain_extra_cost_budget_m,
     )
     write_solution(solution, summary, edges, transformer_nodes, source_nodes)
     return summary

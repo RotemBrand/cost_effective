@@ -25,8 +25,52 @@ def _edge_key(u: str, v: str) -> tuple[str, str]:
     return tuple(sorted((str(u), str(v))))
 
 
+def _terminal_road_node(terminal: str) -> str:
+    return str(terminal).split(":", 1)[1] if ":" in str(terminal) else str(terminal)
+
+
+def _raw_terminal_edge_lengths(input_gpkg: Path) -> dict[tuple[str, str], float]:
+    try:
+        raw_edges = gpd.read_file(input_gpkg, layer="raw_terminal_edges")
+    except Exception:
+        return {}
+    lengths: dict[tuple[str, str], float] = {}
+    for _, row in raw_edges.iterrows():
+        key = _edge_key(str(row.terminal_a), str(row.terminal_b))
+        length = float(row.length_m)
+        if key not in lengths or length < lengths[key]:
+            lengths[key] = length
+    return lengths
+
+
+def _chain_cost_metrics(row, raw_lengths: dict[tuple[str, str], float]) -> dict[str, float | str]:
+    length_m = float(row.length_m)
+    sequence = [token for token in str(row.terminal_sequence).split("|") if token]
+    segment_lengths: list[float] = []
+    for a, b in zip(sequence, sequence[1:]):
+        segment = raw_lengths.get(_edge_key(a, b))
+        if segment is not None:
+            segment_lengths.append(float(segment))
+    if not segment_lengths:
+        n_segments = max(1, len(sequence) - 1)
+        segment_lengths = [length_m / n_segments for _ in range(n_segments)]
+
+    max_segment = max(segment_lengths) if segment_lengths else length_m
+    has_internal_terminals = int(row.internal_terminal_count) > 0
+    tree_service = max(0.0, length_m - max_segment) if has_internal_terminals else 0.0
+    extra_backbone = length_m - tree_service
+    return {
+        "chain_total_length_m": length_m,
+        "chain_max_segment_length_m": float(max_segment),
+        "chain_tree_service_length_m": float(tree_service),
+        "chain_extra_backbone_cost_m": float(extra_backbone),
+        "terminal_sequence": str(row.terminal_sequence),
+    }
+
+
 def load_ilp_graph(input_gpkg: Path = INPUT_GPKG) -> tuple[nx.Graph, gpd.GeoDataFrame, gpd.GeoDataFrame, gpd.GeoDataFrame, dict[str, set[tuple[str, str]]]]:
     edges = gpd.read_file(input_gpkg, layer="ilp_edges")
+    raw_lengths = _raw_terminal_edge_lengths(input_gpkg)
     transformer_nodes = gpd.read_file(input_gpkg, layer="ilp_transformer_nodes")
     source_nodes = gpd.read_file(input_gpkg, layer="ilp_source_nodes")
     nodes = pd.concat([transformer_nodes, source_nodes], ignore_index=True)
@@ -75,6 +119,7 @@ def load_ilp_graph(input_gpkg: Path = INPUT_GPKG) -> tuple[nx.Graph, gpd.GeoData
             length_m=length_m,
             edge_transformer_count=int(row.edge_transformer_count),
             edge_size_kva=float(row.edge_size_kva),
+            **_chain_cost_metrics(row, raw_lengths),
         )
         if u_raw in original_source_incident:
             original_source_incident[u_raw].add(_edge_key(u, v))
@@ -98,13 +143,20 @@ def solve_min_2edge(
     objective_mode: str = "min_length",
     coverage_attr: str = "edge_size_kva",
     coverage_tolerance: float = 1e-6,
+    source_min_incident_edges: int = 1,
+    chain_extra_cost_budget_m: float | None = None,
 ) -> tuple[nx.Graph | None, dict]:
     if redundancy is not None and max_redundancy is not None:
         raise ValueError("Use either exact redundancy or max_redundancy, not both")
     if cut_mode not in {"iterative", "callback"}:
         raise ValueError("cut_mode must be 'iterative' or 'callback'")
-    if objective_mode not in {"min_length", "max_chain_demand_then_min_length"}:
-        raise ValueError("objective_mode must be 'min_length' or 'max_chain_demand_then_min_length'")
+    if objective_mode not in {"min_length", "max_chain_demand_then_min_length", "max_chain_demand_under_cost"}:
+        raise ValueError(
+            "objective_mode must be 'min_length', 'max_chain_demand_then_min_length', "
+            "or 'max_chain_demand_under_cost'"
+        )
+    if source_min_incident_edges < 0:
+        raise ValueError("source_min_incident_edges must be nonnegative")
 
     nodes = sorted(graph.nodes)
     edges = sorted(_edge_key(u, v) for u, v in graph.edges)
@@ -127,18 +179,25 @@ def solve_min_2edge(
     warm_start_edges = {_edge_key(u, v) for u, v in (warm_start_edges or set())}
     warm_start_edges = {edge for edge in warm_start_edges if edge in x}
     if warm_start_edges:
-        for edge in warm_start_edges:
-            x[edge].Start = 1.0
+        for edge in edges:
+            x[edge].Start = 1.0 if edge in warm_start_edges else 0.0
     for node in nodes:
         model.addConstr(gp.quicksum(x[e] for e in incident[node]) >= 2, name=f"deg2[{node}]")
 
     source_connectivity_constraints = 0
+    insufficient_source_degree_candidates: dict[str, int] = {}
     if original_source_incident:
         for source, source_edges in sorted(original_source_incident.items()):
             available_edges = [edge for edge in source_edges if edge in x]
             if not available_edges:
                 continue
-            model.addConstr(gp.quicksum(x[e] for e in available_edges) >= 1, name=f"source_incident[{source}]")
+            enforced_min = min(int(source_min_incident_edges), len(available_edges))
+            if len(available_edges) < int(source_min_incident_edges):
+                insufficient_source_degree_candidates[source] = len(available_edges)
+            model.addConstr(
+                gp.quicksum(x[e] for e in available_edges) >= enforced_min,
+                name=f"source_incident[{source}]",
+            )
             source_connectivity_constraints += 1
 
     if redundancy is not None:
@@ -155,8 +214,19 @@ def solve_min_2edge(
     length_expr = gp.quicksum(float(graph.edges[e]["length_m"]) * x[e] for e in edges)
     coverage_weights = {e: float(graph.edges[e].get(coverage_attr, 0.0) or 0.0) for e in edges}
     coverage_expr = gp.quicksum(coverage_weights[e] * x[e] for e in edges)
+    chain_extra_costs = {e: float(graph.edges[e].get("chain_extra_backbone_cost_m", graph.edges[e]["length_m"]) or 0.0) for e in edges}
+    chain_extra_cost_expr = gp.quicksum(chain_extra_costs[e] * x[e] for e in edges)
+    if chain_extra_cost_budget_m is not None:
+        model.addConstr(
+            chain_extra_cost_expr <= float(chain_extra_cost_budget_m),
+            name="chain_extra_cost_budget",
+        )
     node_coverage_weight = sum(float(graph.nodes[node].get("size_kva", 0.0) or 0.0) for node in nodes)
     total_edge_coverage_weight = sum(coverage_weights.values())
+    total_chain_tree_service_length_m = sum(
+        float(graph.edges[e].get("chain_tree_service_length_m", 0.0) or 0.0) for e in edges
+    )
+    total_chain_extra_cost_m = sum(chain_extra_costs.values())
     objective_phases: list[dict] = []
 
     start = time.time()
@@ -280,10 +350,11 @@ def solve_min_2edge(
                 "mip_gap": float(model.MIPGap) if model.SolCount else None,
                 "selected_edge_coverage_weight": float(sum(coverage_weights[e] for e in selected_edges)),
                 "selected_length_m": float(sum(float(graph.edges[e]["length_m"]) for e in selected_edges)),
+                "selected_chain_extra_cost_m": float(sum(chain_extra_costs[e] for e in selected_edges)),
             }
         )
 
-    if objective_mode == "max_chain_demand_then_min_length":
+    if objective_mode in {"max_chain_demand_then_min_length", "max_chain_demand_under_cost"}:
         model.setObjective(coverage_expr, GRB.MAXIMIZE)
         run_optimization_phase("maximize_chain_demand")
         if model.SolCount > 0:
@@ -307,6 +378,7 @@ def solve_min_2edge(
                         "added_cuts": 0,
                         "selected_edge_coverage_weight": selected_coverage,
                         "selected_length_m": float(sum(float(graph.edges[e]["length_m"]) for e in selected_edges)),
+                        "selected_chain_extra_cost_m": float(sum(chain_extra_costs[e] for e in selected_edges)),
                     }
                 )
     else:
@@ -316,6 +388,7 @@ def solve_min_2edge(
     elapsed = time.time() - start
     selected_length_m = float(sum(float(graph.edges[e]["length_m"]) for e in selected_edges))
     selected_edge_coverage_weight = float(sum(coverage_weights[e] for e in selected_edges))
+    selected_chain_extra_cost_m = float(sum(chain_extra_costs[e] for e in selected_edges))
     selected_total_coverage_weight = float(node_coverage_weight + selected_edge_coverage_weight)
     if model.SolCount == 0:
         return None, {
@@ -334,13 +407,18 @@ def solve_min_2edge(
             "requested_mip_gap": mip_gap,
             "cut_mode": cut_mode,
             "source_connectivity_constraints": source_connectivity_constraints,
+            "source_min_incident_edges": int(source_min_incident_edges),
+            "insufficient_source_degree_candidates": insufficient_source_degree_candidates,
             "warm_start_edges": len(warm_start_edges),
             "objective_mode": objective_mode,
             "coverage_attr": coverage_attr,
+            "chain_extra_cost_budget_m": None if chain_extra_cost_budget_m is None else float(chain_extra_cost_budget_m),
             "objective_phases": objective_phases,
             "best_bound_phase": objective_phases[-1]["phase"] if objective_phases else None,
             "node_coverage_weight": float(node_coverage_weight),
             "total_edge_coverage_weight": float(total_edge_coverage_weight),
+            "total_chain_tree_service_length_m": float(total_chain_tree_service_length_m),
+            "total_chain_extra_cost_m": float(total_chain_extra_cost_m),
         }
 
     solution = nx.Graph()
@@ -374,13 +452,19 @@ def solve_min_2edge(
         "requested_mip_gap": mip_gap,
         "cut_mode": cut_mode,
         "source_connectivity_constraints": source_connectivity_constraints,
+        "source_min_incident_edges": int(source_min_incident_edges),
+        "insufficient_source_degree_candidates": insufficient_source_degree_candidates,
         "warm_start_edges": len(warm_start_edges),
         "objective_mode": objective_mode,
         "coverage_attr": coverage_attr,
+        "chain_extra_cost_budget_m": None if chain_extra_cost_budget_m is None else float(chain_extra_cost_budget_m),
         "objective_phases": objective_phases,
         "best_bound_phase": objective_phases[-1]["phase"] if objective_phases else None,
         "node_coverage_weight": float(node_coverage_weight),
         "total_edge_coverage_weight": float(total_edge_coverage_weight),
+        "total_chain_tree_service_length_m": float(total_chain_tree_service_length_m),
+        "total_chain_extra_cost_m": float(total_chain_extra_cost_m),
+        "selected_chain_extra_cost_m": selected_chain_extra_cost_m,
         "selected_edge_coverage_weight": selected_edge_coverage_weight,
         "selected_total_coverage_weight": selected_total_coverage_weight,
         "selected_edge_coverage_fraction": (
@@ -460,6 +544,8 @@ def write_solution(
 
 
 def _summary_markdown(summary: dict) -> str:
+    best_bound = summary.get("best_bound")
+    best_bound_text = "" if best_bound is None else f"{float(best_bound):.3f}"
     lines = [
         "# P2U ILP 2-Edge Solution",
         "",
@@ -475,16 +561,21 @@ def _summary_markdown(summary: dict) -> str:
         f"- Solution bridge count: `{summary.get('solution_bridge_count')}`",
         f"- Solution is 2-edge-connected: `{summary.get('solution_is_2edge_connected')}`",
         f"- Source incident constraints: `{summary.get('source_connectivity_constraints')}`",
+        f"- Source min incident edges: `{summary.get('source_min_incident_edges')}`",
+        f"- Sources with insufficient candidates: `{summary.get('insufficient_source_degree_candidates')}`",
         f"- Original sources with candidate edges: `{summary.get('original_sources_with_candidate_edges')}`",
         f"- Selected original sources with incident edge: `{summary.get('selected_original_sources_with_incident_edge')}`",
         f"- Objective mode: `{summary.get('objective_mode')}`",
         f"- Coverage attribute: `{summary.get('coverage_attr')}`",
+        f"- Chain extra cost budget: `{summary.get('chain_extra_cost_budget_m')}` m",
+        f"- Selected chain extra cost: `{summary.get('selected_chain_extra_cost_m')}` m",
+        f"- Total chain tree service length: `{summary.get('total_chain_tree_service_length_m')}` m",
         f"- Selected edge coverage: `{summary.get('selected_edge_coverage_weight', 0):.3f}`",
         f"- Total edge coverage available: `{summary.get('total_edge_coverage_weight', 0):.3f}`",
         f"- Selected edge coverage fraction: `{summary.get('selected_edge_coverage_fraction')}`",
         f"- Selected total coverage fraction: `{summary.get('selected_total_coverage_fraction')}`",
         f"- Objective length: `{summary.get('objective_length_m', 0):.3f}` m",
-        f"- Best bound from phase `{summary.get('best_bound_phase')}`: `{summary.get('best_bound', 0):.3f}`",
+        f"- Best bound from phase `{summary.get('best_bound_phase')}`: `{best_bound_text}`",
         f"- MIP gap: `{summary.get('mip_gap')}`",
         f"- Redundancy constraint: `{summary.get('redundancy_constraint')}`",
         f"- Max redundancy constraint: `{summary.get('max_redundancy_constraint')}`",
@@ -507,11 +598,13 @@ def main() -> None:
     parser.add_argument("--cut-mode", choices=["iterative", "callback"], default="iterative")
     parser.add_argument(
         "--objective-mode",
-        choices=["min_length", "max_chain_demand_then_min_length"],
+        choices=["min_length", "max_chain_demand_then_min_length", "max_chain_demand_under_cost"],
         default="min_length",
     )
     parser.add_argument("--coverage-attr", default="edge_size_kva")
     parser.add_argument("--coverage-tolerance", type=float, default=1e-6)
+    parser.add_argument("--source-min-incident-edges", type=int, default=1)
+    parser.add_argument("--chain-extra-cost-budget-m", type=float, default=None)
     parser.add_argument("--output-gpkg", type=Path, default=OUTPUT_GPKG)
     parser.add_argument("--summary-json", type=Path, default=SUMMARY_JSON)
     parser.add_argument("--summary-md", type=Path, default=SUMMARY_MD)
@@ -531,6 +624,8 @@ def main() -> None:
         objective_mode=args.objective_mode,
         coverage_attr=args.coverage_attr,
         coverage_tolerance=args.coverage_tolerance,
+        source_min_incident_edges=args.source_min_incident_edges,
+        chain_extra_cost_budget_m=args.chain_extra_cost_budget_m,
     )
     write_solution(
         solution,
