@@ -1,0 +1,23 @@
+{
+  "width_scale": {
+    "clip_km": 10.233041780944328,
+    "min_width": 0.36,
+    "max_width": 2.35
+  },
+  "cases": [
+    {
+      "key": "original",
+      "label": "Original",
+      "generalized_chain_count": 324,
+      "lambda_mean_km": 0.32438624119615833,
+      "lambda_max_km": 4.037640858950004
+    },
+    {
+      "key": "R64",
+      "label": "Source-repaired R64",
+      "generalized_chain_count": 128,
+      "lambda_mean_km": 3.1250437239092124,
+      "lambda_max_km": 27.492180360375425
+    }
+  ]
+}

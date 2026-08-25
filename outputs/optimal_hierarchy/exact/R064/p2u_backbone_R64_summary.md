@@ -1,0 +1,35 @@
+# P2U ILP 2-Edge Solution
+
+- Status: `HEURISTIC_SOURCE_REPAIRED`
+- Stop reason: `source_redundant_edges_added`
+- Runtime: `0.00` s
+- Cut rounds: `0`
+- Added cuts: `0`
+- Input nodes/edges: `5296` / `16985`
+- Solution nodes/edges: `5296` / `5359`
+- Solution cycle rank: `64`
+- Solution connected: `True`
+- Solution bridge count: `0`
+- Solution is 2-edge-connected: `True`
+- Source incident constraints: `15`
+- Source min incident edges: `2`
+- Sources with insufficient candidates: `{'S:SM37709': 1}`
+- Original sources with candidate edges: `15`
+- Selected original sources with incident edge: `15`
+- Objective mode: `add_source_redundant_edges`
+- Coverage attribute: `edge_size_kva`
+- Chain extra cost budget: `392542.5734814036` m
+- Selected chain extra cost: `393185.31471008644` m
+- Total chain tree service length: `105185.04739771555` m
+- Selected edge coverage: `165700.000`
+- Total edge coverage available: `330950.000`
+- Selected edge coverage fraction: `0.5006798610061943`
+- Selected total coverage fraction: `None`
+- Objective length: `442855.259` m
+- Best bound from phase `None`: ``
+- MIP gap: `None`
+- Redundancy constraint: `64`
+- Max redundancy constraint: `None`
+- Cut mode: `heuristic`
+- Threads: `0`
+- Requested MIPGap: `None`
